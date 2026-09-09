@@ -9,6 +9,13 @@ using RomRebuilderUI.Models;
 
 namespace RomRebuilderUI.Services
 {
+    public class RebuildProgressReport
+    {
+        public int Current { get; set; }
+        public int Total { get; set; }
+        public string CurrentMessage { get; set; } = string.Empty;
+    }
+
     public class RebuildResult
     {
         public int Processed { get; set; }
@@ -60,36 +67,31 @@ namespace RomRebuilderUI.Services
             }
         }
 
-        // --- MAME Audit Overloads ---
-        public async Task<AuditSummary> RunMameAudit(IEnumerable<string> sourceDirs, string datPath, RebuildMode mode, IProgress<string>? progress = null, Action<MachineAuditItem>? onItemAudited = null)
+        public async Task<AuditSummary> RunMameAudit(IEnumerable<string> sourceDirs, string datPath, RebuildMode mode, IProgress<RebuildProgressReport>? progress = null, Action<MachineAuditItem>? onItemAudited = null)
         {
             return await AuditMameSetsAsync(sourceDirs, datPath, progress, onItemAudited);
         }
 
-        public async Task<AuditSummary> AuditMameSetsAsync(IEnumerable<string> sourceDirs, string datPath, IProgress<string>? progress, Action<MachineAuditItem>? onItemAudited = null)
+        public async Task<AuditSummary> AuditMameSetsAsync(IEnumerable<string> sourceDirs, string datPath, IProgress<RebuildProgressReport>? progress, Action<MachineAuditItem>? onItemAudited = null)
         {
             return await AuditConsoleSetsAsync(sourceDirs, datPath, false, "", datPath, progress, onItemAudited);
         }
 
-        // --- MAME Rebuild Overloads ---
-        public async Task<RebuildResult> RunMameRebuild(IEnumerable<string> sourceDirs, string outputDir, string datPath, RebuildMode mode, OutputFormat format, IProgress<string>? progress = null, Action<RebuildResult>? onProgressUpdate = null)
+        public async Task<RebuildResult> RunMameRebuild(IEnumerable<string> sourceDirs, string outputDir, string datPath, RebuildMode mode, OutputFormat format, IProgress<RebuildProgressReport>? progress = null)
         {
-            return await RebuildMameSetsAsync(sourceDirs, outputDir, datPath, mode, format, progress, onProgressUpdate);
+            return await RebuildMameSetsAsync(sourceDirs, outputDir, datPath, mode, format, progress);
         }
 
-        // --- Console Audit Overloads ---
-        public async Task<AuditSummary> RunConsoleAudit(IEnumerable<string> sourceDirs, string datPath, bool enable1G1R, string regionPriorities, IProgress<string>? progress = null, Action<MachineAuditItem>? onItemAudited = null)
+        public async Task<AuditSummary> RunConsoleAudit(IEnumerable<string> sourceDirs, string datPath, bool enable1G1R, string regionPriorities, IProgress<RebuildProgressReport>? progress = null, Action<MachineAuditItem>? onItemAudited = null)
         {
             return await AuditConsoleSetsAsync(sourceDirs, datPath, enable1G1R, regionPriorities, datPath, progress, onItemAudited);
         }
 
-        // --- Console Rebuild Overloads ---
-        public async Task<RebuildResult> RunConsoleRebuild(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, OutputFormat format, IProgress<string>? progress = null, Action<RebuildResult>? onProgressUpdate = null)
+        public async Task<RebuildResult> RunConsoleRebuild(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, OutputFormat format, IProgress<RebuildProgressReport>? progress = null)
         {
-            return await RebuildConsoleSetsAsync(sourceDirs, outputDir, datPath, enable1G1R, regionPriorities, format, datPath, progress, onProgressUpdate);
+            return await RebuildConsoleSetsAsync(sourceDirs, outputDir, datPath, enable1G1R, regionPriorities, format, datPath, progress);
         }
 
-        // --- DAT Parser Helpers ---
         private class RomDatInfo
         {
             public string Description { get; set; } = string.Empty;
@@ -208,20 +210,18 @@ namespace RomRebuilderUI.Services
             return (nameMappings, romMappings);
         }
 
-        // --- Core Audit Implementation with Live Incremental Callback ---
-        public async Task<AuditSummary> AuditConsoleSetsAsync(IEnumerable<string> sourceDirs, string datPath, bool enable1G1R, string regionPriorities, string actualDatPath, IProgress<string>? progress, Action<MachineAuditItem>? onItemAudited = null)
+        public async Task<AuditSummary> AuditConsoleSetsAsync(IEnumerable<string> sourceDirs, string datPath, bool enable1G1R, string regionPriorities, string actualDatPath, IProgress<RebuildProgressReport>? progress, Action<MachineAuditItem>? onItemAudited = null)
         {
             var summary = new AuditSummary();
             var validDirs = sourceDirs?.Where(d => !string.IsNullOrEmpty(d) && Directory.Exists(d)).ToList() ?? new List<string>();
             if (validDirs.Count == 0)
             {
-                progress?.Report("Error: No valid Source Directories specified.");
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No valid Source Directories specified." });
                 return summary;
             }
 
-            progress?.Report($"Loading DAT file: {actualDatPath}...");
+            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading DAT file: {actualDatPath}..." });
             var (nameMappings, romMappings) = LoadDatMappings(actualDatPath);
-            progress?.Report($"Loaded {nameMappings.Count} name mappings and {romMappings.Count} CRC signatures from DAT.");
 
             var scannedRoms = new List<ScannedRomFile>();
             foreach (var dir in validDirs)
@@ -303,10 +303,15 @@ namespace RomRebuilderUI.Services
                     summary.Items.Add(auditItem);
                     onItemAudited?.Invoke(auditItem);
 
-                    if (index % 50 == 0 || index == scannedRoms.Count)
-                    {
-                        progress?.Report($"Audited {index}/{scannedRoms.Count} files...");
-                    }
+                    progress?.Report(new RebuildProgressReport 
+                    { 
+                        Current = index, 
+                        Total = scannedRoms.Count, 
+                        CurrentMessage = targetName 
+                    });
+
+                    // Give UI thread a chance to refresh
+                    await Task.Delay(1);
                 }
             }
             finally
@@ -319,24 +324,23 @@ namespace RomRebuilderUI.Services
 
             summary.TotalFiles = scannedRoms.Count;
             summary.ValidFiles = validCount;
-            progress?.Report($"Audit complete. Valid: {validCount}, Bad Dumps: {badCount}, Unknown: {unknownCount}");
+            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Audit complete. Valid: {validCount}, Bad Dumps: {badCount}, Unknown: {unknownCount}" });
             return summary;
         }
 
-        // --- MAME Rebuild Implementation with Throttled Progress ---
-        public async Task<RebuildResult> RebuildMameSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, RebuildMode mode, OutputFormat format, IProgress<string>? progress, Action<RebuildResult>? onProgressUpdate = null)
+        public async Task<RebuildResult> RebuildMameSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, RebuildMode mode, OutputFormat format, IProgress<RebuildProgressReport>? progress)
         {
             var result = new RebuildResult();
             if (string.IsNullOrEmpty(outputDir))
             {
-                progress?.Report("Error: Output directory is not specified.");
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: Output directory is not specified." });
                 return result;
             }
 
             var validDirs = sourceDirs?.Where(d => !string.IsNullOrEmpty(d) && Directory.Exists(d)).ToList() ?? new List<string>();
             if (validDirs.Count == 0)
             {
-                progress?.Report("Error: No valid Source Directories specified.");
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No valid Source Directories specified." });
                 return result;
             }
 
@@ -362,19 +366,18 @@ namespace RomRebuilderUI.Services
             string targetOutputDir = Path.Combine(outputDir, "mame", SanitizeFileName(mameVersion));
             Directory.CreateDirectory(targetOutputDir);
 
-            progress?.Report($"Loading MAME DAT file: {datPath} with Rebuild Mode [{mode}]...");
+            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading MAME DAT file: {datPath} with Rebuild Mode [{mode}]..." });
 
             var machines = LoadMameDatMachines(datPath);
             if (machines.Count == 0)
             {
-                progress?.Report("Error: No machines found in DAT file or invalid DAT.");
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No machines found in DAT file or invalid DAT." });
                 return result;
             }
 
             var scannedRoms = new List<ScannedRomFile>();
             foreach (var dir in validDirs)
             {
-                progress?.Report($"Scanning source ROM directory: {dir}...");
                 var filesInDir = await Task.Run(() => RomScanner.ScanDirectory(dir));
                 scannedRoms.AddRange(filesInDir);
             }
@@ -421,8 +424,6 @@ namespace RomRebuilderUI.Services
                         }
                     }
                 }
-
-                progress?.Report($"Indexed {availableRoms.Count} unique source ROM files.");
 
                 var parentToClones = machines.Values
                     .Where(m => !string.IsNullOrEmpty(m.CloneOf))
@@ -546,23 +547,22 @@ namespace RomRebuilderUI.Services
                             }
                             result.Moved++;
                         }
-                        catch (Exception ex)
+                        catch
                         {
                             result.Failed++;
-                            progress?.Report($"[Error] Failed to build set {machine.Name}: {ex.Message}");
                         }
                     }
 
-                    if (machineIndex % 50 == 0 || machineIndex == machines.Count)
+                    progress?.Report(new RebuildProgressReport
                     {
-                        progress?.Report($"Rebuilt {result.Processed}/{machines.Count} MAME sets...");
-                    }
+                        Current = machineIndex,
+                        Total = machines.Count,
+                        CurrentMessage = machine.Name
+                    });
 
-                    onProgressUpdate?.Invoke(result);
-                    await Task.Yield();
+                    // Give UI thread a chance to refresh
+                    await Task.Delay(1);
                 }
-
-                progress?.Report($"MAME rebuild finished! Created {result.Moved} sets in 'mame/{mameVersion}/' folder.");
             }
             finally
             {
@@ -575,20 +575,19 @@ namespace RomRebuilderUI.Services
             return result;
         }
 
-        // --- Core Console Rebuild Implementation with Throttled Progress ---
-        public async Task<RebuildResult> RebuildConsoleSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, OutputFormat format, string actualDatPath, IProgress<string>? progress, Action<RebuildResult>? onProgressUpdate = null)
+        public async Task<RebuildResult> RebuildConsoleSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, OutputFormat format, string actualDatPath, IProgress<RebuildProgressReport>? progress)
         {
             var result = new RebuildResult();
             if (string.IsNullOrEmpty(outputDir))
             {
-                progress?.Report("Error: Output directory is not specified.");
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: Output directory is not specified." });
                 return result;
             }
 
             var validDirs = sourceDirs?.Where(d => !string.IsNullOrEmpty(d) && Directory.Exists(d)).ToList() ?? new List<string>();
             if (validDirs.Count == 0)
             {
-                progress?.Report("Error: No valid Source Directories specified.");
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No valid Source Directories specified." });
                 return result;
             }
 
@@ -613,7 +612,7 @@ namespace RomRebuilderUI.Services
             string badDir = Path.Combine(targetOutputDir, "_BadDumps");
             string unknownDir = Path.Combine(targetOutputDir, "_Unknown");
 
-            progress?.Report($"Loading DAT file for rebuild: {actualDatPath}...");
+            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading DAT file for rebuild: {actualDatPath}..." });
             var (nameMappings, romMappings) = LoadDatMappings(actualDatPath);
             
             var scannedRoms = new List<ScannedRomFile>();
@@ -655,6 +654,7 @@ namespace RomRebuilderUI.Services
 
                         string fileCrc = CalculateCrc32(fileToAnalyze);
                         var crcKey = (fileSize, fileCrc.ToUpperInvariant());
+                        string fileNameOnly = Path.GetFileName(rom.FilePath);
 
                         if (romMappings.TryGetValue(crcKey, out var datInfo))
                         {
@@ -671,31 +671,32 @@ namespace RomRebuilderUI.Services
                         else if (nameMappings.ContainsKey(Path.GetFileNameWithoutExtension(fileToAnalyze)))
                         {
                             Directory.CreateDirectory(badDir);
-                            string destBad = Path.Combine(badDir, Path.GetFileName(rom.FilePath));
+                            string destBad = Path.Combine(badDir, fileNameOnly);
                             File.Copy(rom.FilePath, destBad, true);
                             result.Moved++;
                         }
                         else
                         {
                             Directory.CreateDirectory(unknownDir);
-                            string destUnknown = Path.Combine(unknownDir, Path.GetFileName(rom.FilePath));
+                            string destUnknown = Path.Combine(unknownDir, fileNameOnly);
                             File.Copy(rom.FilePath, destUnknown, true);
                             result.Moved++;
                         }
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         result.Failed++;
-                        progress?.Report($"[Error] Failed to process file: {ex.Message}");
                     }
 
-                    if (result.Processed % 50 == 0 || result.Processed == scannedRoms.Count)
+                    progress?.Report(new RebuildProgressReport
                     {
-                        progress?.Report($"Processed {result.Processed}/{scannedRoms.Count} console files...");
-                    }
+                        Current = result.Processed,
+                        Total = scannedRoms.Count,
+                        CurrentMessage = Path.GetFileName(rom.FilePath)
+                    });
 
-                    onProgressUpdate?.Invoke(result);
-                    await Task.Yield();
+                    // Give UI thread a chance to refresh
+                    await Task.Delay(1);
                 }
             }
             finally
@@ -706,7 +707,6 @@ namespace RomRebuilderUI.Services
                 }
             }
 
-            progress?.Report($"Rebuild finished! Processed {result.Processed} files into '{vendor}/{system}'.");
             return result;
         }
 

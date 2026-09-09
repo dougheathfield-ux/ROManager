@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ namespace RomRebuilderUI.ViewModels
     public partial class MainViewModel : ObservableObject
     {
         private readonly RomRebuilderService _rebuilderService = new();
+        private readonly Stopwatch _stopwatch = new();
         private List<MachineAuditItem> _allAuditItems = new();
         private const string LogFileName = "rom_rebuilder_debug.log";
 
@@ -38,10 +40,28 @@ namespace RomRebuilderUI.ViewModels
         public Array RebuildModes => Enum.GetValues(typeof(RebuildMode));
         public Array OutputFormats => Enum.GetValues(typeof(OutputFormat));
 
-        [ObservableProperty] private ObservableCollection<string> _logEntries = new() { "Ready. Configure your paths and options, then run audit or rebuild." };
         [ObservableProperty] private bool _isWorking = false;
         [ObservableProperty] private string _searchFilter = string.Empty;
         [ObservableProperty] private ObservableCollection<MachineAuditItem> _filteredMachines = new();
+
+        // --- Live Log Property ---
+        [ObservableProperty] private ObservableCollection<string> _logEntries = new();
+
+        // --- Rebuild Information Tab Properties ---
+        [ObservableProperty] private string _lastRebuildTitle = "No Rebuild Performed Yet";
+        [ObservableProperty] private int _lastRebuildProcessed;
+        [ObservableProperty] private int _lastRebuildSuccessful;
+        [ObservableProperty] private int _lastRebuildFailed;
+        [ObservableProperty] private int _lastRebuildBadDumps;
+        [ObservableProperty] private int _lastRebuildUnknown;
+        [ObservableProperty] private int _lastRebuildMissing;
+        [ObservableProperty] private string _lastRebuildElapsedTime = "00:00";
+
+        // --- Progress & Timer Properties ---
+        [ObservableProperty] private int _progressValue;
+        [ObservableProperty] private int _progressMaximum = 100;
+        [ObservableProperty] private string _statusMessage = "Ready";
+        [ObservableProperty] private string _elapsedTimeSpan = "00:00";
 
         // --- Audit Summary Statistics Properties ---
         [ObservableProperty] private int _totalScanned;
@@ -49,10 +69,8 @@ namespace RomRebuilderUI.ViewModels
         [ObservableProperty] private int _unknownCount;
         [ObservableProperty] private int _badOrNotNeededCount;
 
-        // --- Rebuild Operation Statistics Properties ---
-        [ObservableProperty] private int _rebuildProcessedCount;
-        [ObservableProperty] private int _rebuildMovedCount;
-        [ObservableProperty] private int _rebuildFailedCount;
+        // --- Optional callback if popup is still desired ---
+        public Action<RebuildReportModel>? ShowReportCallback { get; set; }
 
         public MainViewModel()
         {
@@ -100,14 +118,17 @@ namespace RomRebuilderUI.ViewModels
             SettingsManager.SavePreferences(prefs);
         }
 
-        // --- Folder Management & Log Commands ---
-        [RelayCommand]
-        public void ClearLog()
+        private async Task StartOperationTimer()
         {
-            LogEntries.Clear();
-            WriteDebugLog("Log cleared by user.");
+            _stopwatch.Restart();
+            while (IsWorking)
+            {
+                ElapsedTimeSpan = _stopwatch.Elapsed.ToString(@"mm\:ss");
+                await Task.Delay(1000);
+            }
         }
 
+        // --- Folder Management Commands ---
         [RelayCommand]
         public void AddMameSource(string path)
         {
@@ -154,17 +175,13 @@ namespace RomRebuilderUI.ViewModels
             {
                 var formattedMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {message}";
                 File.AppendAllText(LogFileName, formattedMessage + Environment.NewLine);
+                
+                Dispatcher.UIThread.Post(() =>
+                {
+                    LogEntries.Add(formattedMessage);
+                });
             }
             catch { }
-        }
-
-        private void AppendLog(string message)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                LogEntries.Add(message);
-            });
-            WriteDebugLog(message);
         }
 
         private void ApplyFilter()
@@ -196,10 +213,18 @@ namespace RomRebuilderUI.ViewModels
             if (IsWorking) return;
             SavePreferences();
             IsWorking = true;
-            AppendLog($"Initializing MAME Audit ({SelectedRebuildMode})...");
-            WriteDebugLog("Starting MAME Audit...");
+            ProgressValue = 0;
+            ProgressMaximum = 100;
 
-            var progress = new Progress<string>(msg => AppendLog(msg));
+            _ = StartOperationTimer();
+            WriteDebugLog($"Initializing MAME Audit ({SelectedRebuildMode})...");
+
+            var progress = new Progress<RebuildProgressReport>(report =>
+            {
+                if (report.Total > 0) ProgressMaximum = report.Total;
+                if (report.Current > 0) ProgressValue = report.Current;
+                if (!string.IsNullOrEmpty(report.CurrentMessage)) StatusMessage = report.CurrentMessage;
+            });
 
             _allAuditItems.Clear();
             FilteredMachines.Clear();
@@ -227,18 +252,17 @@ namespace RomRebuilderUI.ViewModels
                         });
                     }
                 );
-
                 WriteDebugLog($"MAME Audit completed successfully with {_allAuditItems.Count} items.");
             }
             catch (Exception ex) 
             { 
-                AppendLog($"[Error] {ex.Message}");
                 WriteDebugLog($"Exception in MAME Audit: {ex}");
             }
             finally 
             { 
+                _stopwatch.Stop();
                 IsWorking = false; 
-                AppendLog("=== MAME Audit Complete ==="); 
+                WriteDebugLog("=== MAME Audit Complete ==="); 
             }
         }
 
@@ -248,51 +272,50 @@ namespace RomRebuilderUI.ViewModels
             if (IsWorking) return;
             SavePreferences();
             IsWorking = true;
-            AppendLog($"Initializing MAME Rebuild ({SelectedRebuildMode}, Format: {MameOutputFormat})...");
-            WriteDebugLog("Starting MAME Rebuild...");
+            ProgressValue = 0;
+            ProgressMaximum = 100;
 
-            RebuildProcessedCount = 0;
-            RebuildMovedCount = 0;
-            RebuildFailedCount = 0;
+            _ = StartOperationTimer();
+            WriteDebugLog($"Initializing MAME Rebuild ({SelectedRebuildMode}, Format: {MameOutputFormat})...");
 
-            var progress = new Progress<string>(msg => AppendLog(msg));
+            var progress = new Progress<RebuildProgressReport>(report =>
+            {
+                if (report.Total > 0) ProgressMaximum = report.Total;
+                if (report.Current > 0) ProgressValue = report.Current;
+                if (!string.IsNullOrEmpty(report.CurrentMessage)) StatusMessage = report.CurrentMessage;
+            });
 
             try
             {
-                var result = await _rebuilderService.RunMameRebuild(
+                await _rebuilderService.RunMameRebuild(
                     MameSourceDirs, 
                     MameOutputDir, 
                     MameDatPath, 
                     SelectedRebuildMode, 
                     MameOutputFormat, 
-                    progress,
-                    onProgressUpdate: currentResult =>
-                    {
-                        Dispatcher.UIThread.Post(() =>
-                        {
-                            RebuildProcessedCount = currentResult.Processed;
-                            RebuildMovedCount = currentResult.Moved;
-                            RebuildFailedCount = currentResult.Failed;
-                        });
-                    }
+                    progress
                 );
-
-                RebuildProcessedCount = result.Processed;
-                RebuildMovedCount = result.Moved;
-                RebuildFailedCount = result.Failed;
 
                 WriteDebugLog("MAME Rebuild completed successfully.");
             }
             catch (Exception ex) 
             { 
-                AppendLog($"[Error] {ex.Message}");
-                RebuildFailedCount++;
                 WriteDebugLog($"Exception in MAME Rebuild: {ex}");
             }
             finally 
             { 
+                _stopwatch.Stop();
                 IsWorking = false; 
-                AppendLog("=== MAME Rebuild Complete ==="); 
+                WriteDebugLog("=== MAME Rebuild Complete ==="); 
+
+                // Populate Rebuild Info tab fields
+                LastRebuildTitle = "MAME Rebuild Statistics";
+                LastRebuildProcessed = TotalScanned;
+                LastRebuildSuccessful = MatchedCount;
+                LastRebuildUnknown = UnknownCount;
+                LastRebuildBadDumps = BadOrNotNeededCount;
+                LastRebuildMissing = _allAuditItems.Count(i => i.Status.Contains("Missing"));
+                LastRebuildElapsedTime = ElapsedTimeSpan;
             }
         }
 
@@ -301,24 +324,32 @@ namespace RomRebuilderUI.ViewModels
         {
             if (IsWorking) return;
 
-            WriteDebugLog("AuditConsoleAsync triggered.");
-
             if (!File.Exists(ConsoleDatPath))
             {
-                AppendLog($"[Error] DAT file not found at: {ConsoleDatPath}");
+                WriteDebugLog($"[Error] DAT file not found at: {ConsoleDatPath}");
                 return;
             }
 
             if (!ConsoleSourceDirs.Any(d => Directory.Exists(d)))
             {
-                AppendLog($"[Error] No valid source directories found in the list.");
+                WriteDebugLog($"[Error] No valid source directories found in the list.");
                 return;
             }
 
             SavePreferences();
             IsWorking = true;
-            AppendLog($"Initializing Console Audit (1G1R: {Enable1G1R})...");
-            var progress = new Progress<string>(msg => AppendLog(msg));
+            ProgressValue = 0;
+            ProgressMaximum = 100;
+
+            _ = StartOperationTimer();
+            WriteDebugLog($"Initializing Console Audit (1G1R: {Enable1G1R})...");
+
+            var progress = new Progress<RebuildProgressReport>(report =>
+            {
+                if (report.Total > 0) ProgressMaximum = report.Total;
+                if (report.Current > 0) ProgressValue = report.Current;
+                if (!string.IsNullOrEmpty(report.CurrentMessage)) StatusMessage = report.CurrentMessage;
+            });
 
             _allAuditItems.Clear();
             FilteredMachines.Clear();
@@ -347,18 +378,17 @@ namespace RomRebuilderUI.ViewModels
                         });
                     }
                 );
-
                 WriteDebugLog($"Console Audit successfully loaded {_allAuditItems.Count} items into DataGrid.");
             }
             catch (Exception ex) 
             { 
-                AppendLog($"[Error] {ex.Message}");
                 WriteDebugLog($"EXCEPTION in Console Audit: {ex}");
             }
             finally 
             { 
+                _stopwatch.Stop();
                 IsWorking = false; 
-                AppendLog("=== Console Audit Complete ==="); 
+                WriteDebugLog("=== Console Audit Complete ==="); 
             }
         }
 
@@ -367,67 +397,65 @@ namespace RomRebuilderUI.ViewModels
         {
             if (IsWorking) return;
 
-            WriteDebugLog("RebuildConsoleAsync triggered.");
-
             if (!File.Exists(ConsoleDatPath))
             {
-                AppendLog($"[Error] DAT file not found at: {ConsoleDatPath}");
+                WriteDebugLog($"[Error] DAT file not found at: {ConsoleDatPath}");
                 return;
             }
 
             if (!ConsoleSourceDirs.Any(d => Directory.Exists(d)))
             {
-                AppendLog($"[Error] No valid source directories found in the list.");
+                WriteDebugLog($"[Error] No valid source directories found in the list.");
                 return;
             }
 
             SavePreferences();
             IsWorking = true;
-            AppendLog($"Initializing Console Rebuild (Format: {ConsoleOutputFormat}, 1G1R: {Enable1G1R})...");
-            
-            RebuildProcessedCount = 0;
-            RebuildMovedCount = 0;
-            RebuildFailedCount = 0;
+            ProgressValue = 0;
+            ProgressMaximum = 100;
 
-            var progress = new Progress<string>(msg => AppendLog(msg));
+            _ = StartOperationTimer();
+            WriteDebugLog($"Initializing Console Rebuild (Format: {ConsoleOutputFormat}, 1G1R: {Enable1G1R})...");
+
+            var progress = new Progress<RebuildProgressReport>(report =>
+            {
+                if (report.Total > 0) ProgressMaximum = report.Total;
+                if (report.Current > 0) ProgressValue = report.Current;
+                if (!string.IsNullOrEmpty(report.CurrentMessage)) StatusMessage = report.CurrentMessage;
+            });
 
             try
             {
-                var result = await _rebuilderService.RunConsoleRebuild(
+                await _rebuilderService.RunConsoleRebuild(
                     ConsoleSourceDirs, 
                     ConsoleOutputDir, 
                     ConsoleDatPath, 
                     Enable1G1R, 
                     RegionPriorities, 
                     ConsoleOutputFormat, 
-                    progress,
-                    onProgressUpdate: currentResult =>
-                    {
-                        Dispatcher.UIThread.Post(() =>
-                        {
-                            RebuildProcessedCount = currentResult.Processed;
-                            RebuildMovedCount = currentResult.Moved;
-                            RebuildFailedCount = currentResult.Failed;
-                        });
-                    }
+                    progress
                 );
-
-                RebuildProcessedCount = result.Processed;
-                RebuildMovedCount = result.Moved;
-                RebuildFailedCount = result.Failed;
 
                 WriteDebugLog("Console Rebuild completed successfully.");
             }
             catch (Exception ex) 
             { 
-                AppendLog($"[Error] {ex.Message}");
-                RebuildFailedCount++;
                 WriteDebugLog($"EXCEPTION in Console Rebuild: {ex}");
             }
             finally 
             { 
+                _stopwatch.Stop();
                 IsWorking = false; 
-                AppendLog("=== Console Rebuild Complete ==="); 
+                WriteDebugLog("=== Console Rebuild Complete ==="); 
+
+                // Populate Rebuild Info tab fields
+                LastRebuildTitle = "Console Rebuild Statistics";
+                LastRebuildProcessed = TotalScanned;
+                LastRebuildSuccessful = MatchedCount;
+                LastRebuildUnknown = UnknownCount;
+                LastRebuildBadDumps = BadOrNotNeededCount;
+                LastRebuildMissing = _allAuditItems.Count(i => i.Status.Contains("Missing"));
+                LastRebuildElapsedTime = ElapsedTimeSpan;
             }
         }
     }

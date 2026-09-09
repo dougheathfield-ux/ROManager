@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using RomRebuilderUI.ViewModels;
 using RomRebuilderUI.Models;
+using RomRebuilderUI.Views;
 using System.Collections.Specialized;
 
 namespace RomRebuilderUI.Views
@@ -18,7 +19,13 @@ namespace RomRebuilderUI.Views
                 if (DataContext is MainViewModel vm)
                 {
                     vm.FilteredMachines.CollectionChanged += FilteredMachines_CollectionChanged;
-                    vm.LogEntries.CollectionChanged += LogEntries_CollectionChanged;
+                    
+                    // Hook up the report window popup callback
+                    vm.ShowReportCallback = async (reportModel) =>
+                    {
+                        var reportWindow = new RebuildReportWindow(reportModel);
+                        await reportWindow.ShowDialog(this);
+                    };
                 }
             };
         }
@@ -33,23 +40,6 @@ namespace RomRebuilderUI.Views
                     if (addedItem != null)
                     {
                         AuditDataGrid.ScrollIntoView(addedItem, null);
-                    }
-                });
-            }
-        }
-
-        private void LogEntries_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            if (e.Action == NotifyCollectionChangedAction.Add && sender is INotifyCollectionChanged collection)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    // Find the ListBox inside the Live Log tab and scroll to the latest entry
-                    // (Assuming you named the ListBox x:Name="LogListBox" in your XAML, or we can scroll via standard items count if available)
-                    var logListBox = this.FindControl<ListBox>("LogListBox");
-                    if (logListBox != null && logListBox.ItemCount > 0)
-                    {
-                        logListBox.ScrollIntoView(logListBox.ItemCount - 1);
                     }
                 });
             }

@@ -14,7 +14,6 @@
         <Style Selector="TextBlock">
             <Setter Property="FontSize" Value="12"/>
         </Style>
-        <!-- Restrict input TextBoxes only, leaving layout free to expand -->
         <Style Selector="StackPanel TextBox">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Height" Value="28"/>
@@ -40,284 +39,271 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
+
+        <Style Selector="TextBlock.FlashingText">
+            <Style.Animations>
+                <Animation Duration="0:0:0.8" IterationCount="Infinite">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.1"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="440, *" Margin="12">
+    <Grid RowDefinitions="*, Auto" Margin="12,12,12,8">
 
-        <!-- LEFT COLUMN: Mode Selection (MAME vs Consoles) via TabControl -->
-        <TabControl Grid.Column="0" Margin="0,0,12,0" Padding="4">
-            
-            <!-- ================= MAME TAB ================= -->
-            <TabItem Header="MAME">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="10" Margin="4">
-                        <TextBlock Classes="Heading" Text="MAME Configuration"/>
+        <!-- TOP CONTENT AREA -->
+        <Grid Grid.Row="0" ColumnDefinitions="440, *">
 
-                        <!-- Multiple Source Directories List & Buttons -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Source ROMs Directories"/>
-                            <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Height="90">
-                                <ListBox ItemsSource="{Binding MameSourceDirs}" SelectedItem="{Binding SelectedMameSourceDir}" Background="Transparent">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+            <!-- LEFT COLUMN: Mode Selection (MAME vs Consoles) via TabControl -->
+            <TabControl Grid.Column="0" Margin="0,0,12,0" Padding="4">
+                
+                <!-- MAME TAB -->
+                <TabItem Header="MAME">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="10" Margin="4">
+                            <TextBlock Classes="Heading" Text="MAME Configuration"/>
+
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Source ROMs Directories"/>
+                                <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Height="90">
+                                    <ListBox ItemsSource="{Binding MameSourceDirs}" SelectedItem="{Binding SelectedMameSourceDir}" Background="Transparent">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                                <Grid ColumnDefinitions="*, *" Height="26" Margin="0,2,0,0">
+                                    <Button Grid.Column="0" Content="Add Folder..." Click="OnAddMameFolderClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,2,0"/>
+                                    <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveMameSourceCommand}" CommandParameter="{Binding SelectedMameSourceDir}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="2,0,0,0"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Output Directory"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding MameOutputDir}"/>
+                                    <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseMameOutputClick"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="DAT / XML File"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding MameDatPath}"/>
+                                    <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseMameDatClick"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <Separator Margin="0,2"/>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="Heading" Text="MAME Options"/>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Rebuild Mode"/>
+                                    <ComboBox ItemsSource="{Binding RebuildModes}" SelectedItem="{Binding SelectedRebuildMode}" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Output Format"/>
+                                    <ComboBox ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding MameOutputFormat}" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Separator Margin="0,2"/>
+
+                            <UniformGrid Columns="2" Height="32">
+                                <Button Content="Run MAME Audit" Command="{Binding AuditMameCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                                <Button Content="Run MAME Rebuild" Command="{Binding RebuildMameCommand}" Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            </UniformGrid>
+
+                            <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,4,0,0" Background="#11808080">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="Heading" Text="Audit Summary Statistics"/>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Total ROMs Scanned:"/><TextBlock Grid.Column="1" Text="{Binding TotalScanned}" FontWeight="Bold"/></Grid>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Matched Valid ROMs:" Foreground="ForestGreen"/><TextBlock Grid.Column="1" Text="{Binding MatchedCount}" FontWeight="Bold" Foreground="ForestGreen"/></Grid>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Unknown ROMs:" Foreground="Goldenrod"/><TextBlock Grid.Column="1" Text="{Binding UnknownCount}" FontWeight="Bold" Foreground="Goldenrod"/></Grid>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Bad / Not Needed:" Foreground="IndianRed"/><TextBlock Grid.Column="1" Text="{Binding BadOrNotNeededCount}" FontWeight="Bold" Foreground="IndianRed"/></Grid>
+                                </StackPanel>
                             </Border>
-                            <Grid ColumnDefinitions="*, *" Height="26" Margin="0,2,0,0">
-                                <Button Grid.Column="0" Content="Add Folder..." Click="OnAddMameFolderClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,2,0"/>
-                                <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveMameSourceCommand}" CommandParameter="{Binding SelectedMameSourceDir}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="2,0,0,0"/>
-                            </Grid>
                         </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
 
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Output Directory"/>
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBox Grid.Column="0" Text="{Binding MameOutputDir}"/>
-                                <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseMameOutputClick"/>
-                            </Grid>
-                        </StackPanel>
+                <!-- CONSOLES TAB -->
+                <TabItem Header="Consoles">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="10" Margin="4">
+                            <TextBlock Classes="Heading" Text="Console Configuration"/>
 
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="DAT / XML File"/>
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBox Grid.Column="0" Text="{Binding MameDatPath}"/>
-                                <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseMameDatClick"/>
-                            </Grid>
-                        </StackPanel>
-
-                        <Separator Margin="0,2"/>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="Heading" Text="MAME Options"/>
-                            
                             <StackPanel Spacing="2">
-                                <TextBlock Text="Rebuild Mode"/>
-                                <ComboBox ItemsSource="{Binding RebuildModes}" SelectedItem="{Binding SelectedRebuildMode}" HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="Source ROMs Directories"/>
+                                <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Height="90">
+                                    <ListBox ItemsSource="{Binding ConsoleSourceDirs}" SelectedItem="{Binding SelectedConsoleSourceDir}" Background="Transparent">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                                <Grid ColumnDefinitions="*, *" Height="26" Margin="0,2,0,0">
+                                    <Button Grid.Column="0" Content="Add Folder..." Click="OnAddConsoleFolderClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,2,0"/>
+                                    <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveConsoleSourceCommand}" CommandParameter="{Binding SelectedConsoleSourceDir}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="2,0,0,0"/>
+                                </Grid>
                             </StackPanel>
 
                             <StackPanel Spacing="2">
-                                <TextBlock Text="Output Format"/>
-                                <ComboBox ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding MameOutputFormat}" HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="Output Directory"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding ConsoleOutputDir}"/>
+                                    <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseConsoleOutputClick"/>
+                                </Grid>
                             </StackPanel>
-                        </StackPanel>
 
-                        <Separator Margin="0,2"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="DAT File"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding ConsoleDatPath}"/>
+                                    <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseConsoleDatClick"/>
+                                </Grid>
+                            </StackPanel>
 
-                        <UniformGrid Columns="2" Height="32">
-                            <Button Content="Run MAME Audit" Command="{Binding AuditMameCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                            <Button Content="Run MAME Rebuild" Command="{Binding RebuildMameCommand}" Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                        </UniformGrid>
+                            <Separator Margin="0,2"/>
 
-                        <!-- Scan Statistics Panel -->
-                        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,4,0,0" Background="#11808080">
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="Heading" Text="Audit Summary Statistics"/>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Total ROMs Scanned:" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding TotalScanned}" FontWeight="Bold" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Matched Valid ROMs:" VerticalAlignment="Center" Foreground="ForestGreen"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding MatchedCount}" FontWeight="Bold" Foreground="ForestGreen" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Unknown ROMs:" VerticalAlignment="Center" Foreground="Goldenrod"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding UnknownCount}" FontWeight="Bold" Foreground="Goldenrod" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Bad / Not Needed:" VerticalAlignment="Center" Foreground="IndianRed"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding BadOrNotNeededCount}" FontWeight="Bold" Foreground="IndianRed" VerticalAlignment="Center"/>
-                                </Grid>
+                                <TextBlock Classes="Heading" Text="Console Options &amp; 1G1R"/>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Output Format"/>
+                                    <ComboBox ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding ConsoleOutputFormat}" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+                                <CheckBox Content="Enable 1G1R Filtering" IsChecked="{Binding Enable1G1R}" Margin="0,2"/>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Region Priorities"/>
+                                    <TextBox Text="{Binding RegionPriorities}" PlaceholderText="USA, World, Europe, Japan"/>
+                                </StackPanel>
                             </StackPanel>
-                        </Border>
 
-                        <!-- Rebuild Operation Statistics Panel -->
-                        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,4,0,0" Background="#11808080">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="Heading" Text="Rebuild Operation Statistics"/>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Processed ROMs:" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding RebuildProcessedCount}" FontWeight="Bold" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="ROMs Moved / Created:" VerticalAlignment="Center" Foreground="ForestGreen"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding RebuildMovedCount}" FontWeight="Bold" Foreground="ForestGreen" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Failed / Errors:" VerticalAlignment="Center" Foreground="IndianRed"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding RebuildFailedCount}" FontWeight="Bold" Foreground="IndianRed" VerticalAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                            <Separator Margin="0,2"/>
 
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
+                            <UniformGrid Columns="2" Height="32">
+                                <Button Content="Run Console Audit" Command="{Binding AuditConsoleCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                                <Button Content="Run Console Rebuild" Command="{Binding RebuildConsoleCommand}" Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            </UniformGrid>
 
-            <!-- ================= CONSOLES TAB ================= -->
-            <TabItem Header="Consoles">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="10" Margin="4">
-                        <TextBlock Classes="Heading" Text="Console Configuration"/>
-
-                        <!-- Multiple Source Directories List & Buttons -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Source ROMs Directories"/>
-                            <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Height="90">
-                                <ListBox ItemsSource="{Binding ConsoleSourceDirs}" SelectedItem="{Binding SelectedConsoleSourceDir}" Background="Transparent">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                            <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,4,0,0" Background="#11808080">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="Heading" Text="Audit Summary Statistics"/>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Total ROMs Scanned:"/><TextBlock Grid.Column="1" Text="{Binding TotalScanned}" FontWeight="Bold"/></Grid>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Matched Valid ROMs:" Foreground="ForestGreen"/><TextBlock Grid.Column="1" Text="{Binding MatchedCount}" FontWeight="Bold" Foreground="ForestGreen"/></Grid>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Unknown ROMs:" Foreground="Goldenrod"/><TextBlock Grid.Column="1" Text="{Binding UnknownCount}" FontWeight="Bold" Foreground="Goldenrod"/></Grid>
+                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Bad / Not Needed:" Foreground="IndianRed"/><TextBlock Grid.Column="1" Text="{Binding BadOrNotNeededCount}" FontWeight="Bold" Foreground="IndianRed"/></Grid>
+                                </StackPanel>
                             </Border>
-                            <Grid ColumnDefinitions="*, *" Height="26" Margin="0,2,0,0">
-                                <Button Grid.Column="0" Content="Add Folder..." Click="OnAddConsoleFolderClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,2,0"/>
-                                <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveConsoleSourceCommand}" CommandParameter="{Binding SelectedConsoleSourceDir}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="2,0,0,0"/>
-                            </Grid>
                         </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
 
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Output Directory"/>
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBox Grid.Column="0" Text="{Binding ConsoleOutputDir}"/>
-                                <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseConsoleOutputClick"/>
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="DAT File"/>
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBox Grid.Column="0" Text="{Binding ConsoleDatPath}"/>
-                                <Button Grid.Column="1" Content="..." Width="35" Margin="4,0,0,0" Click="OnBrowseConsoleDatClick"/>
-                            </Grid>
-                        </StackPanel>
-
-                        <Separator Margin="0,2"/>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="Heading" Text="Console Options &amp; 1G1R"/>
-                            
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Output Format"/>
-                                <ComboBox ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding ConsoleOutputFormat}" HorizontalAlignment="Stretch"/>
-                            </StackPanel>
-
-                            <CheckBox Content="Enable 1G1R Filtering" IsChecked="{Binding Enable1G1R}" Margin="0,2"/>
-                            
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Region Priorities"/>
-                                <TextBox Text="{Binding RegionPriorities}" PlaceholderText="USA, World, Europe, Japan"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <Separator Margin="0,2"/>
-
-                        <UniformGrid Columns="2" Height="32">
-                            <Button Content="Run Console Audit" Command="{Binding AuditConsoleCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                            <Button Content="Run Console Rebuild" Command="{Binding RebuildConsoleCommand}" Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                        </UniformGrid>
-
-                        <!-- Scan Statistics Panel -->
-                        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,4,0,0" Background="#11808080">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="Heading" Text="Audit Summary Statistics"/>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Total ROMs Scanned:" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding TotalScanned}" FontWeight="Bold" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Matched Valid ROMs:" VerticalAlignment="Center" Foreground="ForestGreen"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding MatchedCount}" FontWeight="Bold" Foreground="ForestGreen" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Unknown ROMs:" VerticalAlignment="Center" Foreground="Goldenrod"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding UnknownCount}" FontWeight="Bold" Foreground="Goldenrod" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Bad / Not Needed:" VerticalAlignment="Center" Foreground="IndianRed"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding BadOrNotNeededCount}" FontWeight="Bold" Foreground="IndianRed" VerticalAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
+            <!-- RIGHT COLUMN: TabControl for Audit Results, Live Log, and Rebuild Information -->
+            <TabControl Grid.Column="1" Margin="0,4,0,0" Padding="4">
+                
+                <!-- TAB 1: Audit Results -->
+                <TabItem Header="Audit Results">
+                    <Grid RowDefinitions="Auto, *" Margin="4">
+                        <TextBox Grid.Row="0" Text="{Binding SearchFilter}" PlaceholderText="Filter machines by name or description..." Margin="0,0,0,6"/>
+                        <Border Grid.Row="1" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4">
+                            <data:DataGrid x:Name="AuditDataGrid" ItemsSource="{Binding FilteredMachines}" AutoGenerateColumns="False" IsReadOnly="True">
+                                <data:DataGrid.Columns>
+                                    <data:DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="300"/>
+                                    <data:DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
+                                    <data:DataGridTextColumn Header="Info / CRC" Binding="{Binding RomCountSummary}" Width="220"/>
+                                    <data:DataGridTemplateColumn Header="Status" Width="120">
+                                        <data:DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" VerticalAlignment="Center" Margin="6,0" FontWeight="SemiBold"/>
+                                            </DataTemplate>
+                                        </data:DataGridTemplateColumn.CellTemplate>
+                                    </data:DataGridTemplateColumn>
+                                </data:DataGrid.Columns>
+                            </data:DataGrid>
                         </Border>
-
-                        <!-- Rebuild Operation Statistics Panel -->
-                        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,4,0,0" Background="#11808080">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="Heading" Text="Rebuild Operation Statistics"/>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Processed ROMs:" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding RebuildProcessedCount}" FontWeight="Bold" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="ROMs Moved / Created:" VerticalAlignment="Center" Foreground="ForestGreen"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding RebuildMovedCount}" FontWeight="Bold" Foreground="ForestGreen" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="Failed / Errors:" VerticalAlignment="Center" Foreground="IndianRed"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding RebuildFailedCount}" FontWeight="Bold" Foreground="IndianRed" VerticalAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-        </TabControl>
-
-        <!-- RIGHT COLUMN: Full-Height Tab Control for Results & Live Logs -->
-        <TabControl Grid.Column="1" Padding="0">
-            <TabItem Header="Audit Results &amp; Filter">
-                <Grid RowDefinitions="Auto, *" Margin="0,4,0,0">
-                    <!-- Search Filter Box -->
-                    <TextBox Grid.Row="0" Text="{Binding SearchFilter}" PlaceholderText="Filter machines by name or description..." Margin="0,0,0,6"/>
-                    <!-- DataGrid Results -->
-                    <Border Grid.Row="1" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4">
-                        <data:DataGrid x:Name="AuditDataGrid" ItemsSource="{Binding FilteredMachines}" AutoGenerateColumns="False" IsReadOnly="True">
-                            <data:DataGrid.Columns>
-                                <data:DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="400"/>
-                                <data:DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
-                                <data:DataGridTextColumn Header="Info / CRC" Binding="{Binding RomCountSummary}" Width="300"/>
-                                <data:DataGridTemplateColumn Header="Status" Width="130">
-                                    <data:DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Status}" 
-                                                       Foreground="{Binding StatusColor}" 
-                                                       VerticalAlignment="Center" 
-                                                       Margin="6,0"
-                                                       FontWeight="SemiBold"/>
-                                        </DataTemplate>
-                                    </data:DataGridTemplateColumn.CellTemplate>
-                                </data:DataGridTemplateColumn>
-                            </data:DataGrid.Columns>
-                        </data:DataGrid>
-                    </Border>
-                </Grid>
-            </TabItem>
-            <TabItem Header="Live Log &amp; Progress">
-                <Grid RowDefinitions="Auto, *" Margin="0,4,0,0">
-                    <!-- Header Toolbar matching the audit tab style -->
-                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,6">
-                        <TextBlock Text="Execution Log &amp; Progress Output" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <Button Grid.Column="1" Content="Clear Log" Command="{Binding ClearLogCommand}" Width="85" Height="28" HorizontalContentAlignment="Center"/>
                     </Grid>
-                    <!-- Log List Container matching the DataGrid border box -->
-                    <Border Grid.Row="1" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4">
-                        <ListBox x:Name="LogListBox" ItemsSource="{Binding LogEntries}" Background="Transparent">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Border>
-                </Grid>
-            </TabItem>
-        </TabControl>
+                </TabItem>
+
+                <!-- TAB 2: Live Log -->
+                <TabItem Header="Live Log">
+                    <Grid RowDefinitions="*, Auto" Margin="4">
+                        <Border Grid.Row="0" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Background="#141414">
+                            <ListBox ItemsSource="{Binding LogEntries}" Background="Transparent">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="11" Foreground="#E0E0E0"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                        <Button Grid.Row="1" Content="Clear Log" Command="{Binding LogEntries.Clear}" Margin="0,8,0,0" Width="100"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- TAB 3: Rebuild Information -->
+                <TabItem Header="Rebuild Information">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="4">
+                        <StackPanel Spacing="15" Margin="10">
+                            <TextBlock Text="{Binding LastRebuildTitle}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="White"/>
+                            
+                            <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="8" Padding="20" Background="#1E1E1E">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="Total Files/Sets Processed:" FontWeight="SemiBold" FontSize="13" Foreground="#E0E0E0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding LastRebuildProcessed}" FontWeight="Bold" FontSize="13" Foreground="White"/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="Successfully Rebuilt/Moved:" Foreground="LightGreen" FontWeight="SemiBold" FontSize="13"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding LastRebuildSuccessful}" Foreground="LightGreen" FontWeight="Bold" FontSize="13"/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="Bad Dumps / Fixed:" FontSize="13" Foreground="#E0E0E0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding LastRebuildBadDumps}" FontWeight="Bold" FontSize="13" Foreground="White"/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="Unknown Files Found:" FontSize="13" Foreground="#E0E0E0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding LastRebuildUnknown}" FontWeight="Bold" FontSize="13" Foreground="White"/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="Missing ROMs / Sets:" Foreground="IndianRed" FontSize="13"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding LastRebuildMissing}" Foreground="IndianRed" FontWeight="Bold" FontSize="13"/>
+                                    </Grid>
+                                    <Separator Margin="0,4"/>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="Elapsed Time:" FontWeight="SemiBold" FontSize="13" Foreground="#E0E0E0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding LastRebuildElapsedTime}" FontWeight="Bold" FontFamily="Consolas" FontSize="13" Foreground="White"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+            </TabControl>
+
+        </Grid>
+
+        <!-- BOTTOM STATUS BAR -->
+        <Border Grid.Row="1" Background="#1E1E1E" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Padding="8,5" Margin="0,8,0,0">
+            <Grid ColumnDefinitions="*, Auto, Auto, Auto">
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="#CCCCCC" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                <ProgressBar Grid.Column="1" Value="{Binding ProgressValue}" Maximum="{Binding ProgressMaximum}" Width="220" Height="12" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="{Binding ElapsedTimeSpan}" VerticalAlignment="Center" FontFamily="Consolas" Margin="0,0,16,0" Foreground="#AAAAAA"/>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding IsWorking}">
+                    <TextBlock Text="●" Classes="FlashingText" Foreground="#FFD700" FontSize="12"/>
+                    <TextBlock Text="PROCESSING..." Classes="FlashingText" Foreground="#FFD700" FontWeight="Bold" FontSize="11"/>
+                </StackPanel>
+            </Grid>
+        </Border>
 
     </Grid>
 </Window>
