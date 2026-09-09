@@ -1,0 +1,51 @@
+# Ignore build outputs
+bin/
+obj/
+
+# Visual Studio / Rider / VS Code files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.userprefs
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+.project.assets.json
+
+# Rider
+.idea/
+*.sln.iml
+
+# Logs
+*.log
+
+# Debug files
+*.pdb
+*.cache
+
+# Runtime files
+*.runtimeconfig.json
+
+# Avalonia generated files
+*.xaml.g.cs
+
+# Package directories
+packages/
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# Other
+*.zip
+*.tar.gz
+*.7z
+
