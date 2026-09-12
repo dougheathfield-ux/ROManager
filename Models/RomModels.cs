@@ -1,34 +1,25 @@
 using System.Collections.Generic;
-using Avalonia.Media; // Required for Avalonia Brushes
+using Avalonia.Media;
 
 namespace RomRebuilderUI.Models
 {
-    public enum RebuildMode
-    {
-        NonMerged,
-        Split,
-        Merged
-    }
-
-    public enum OutputFormat
-    {
-        Zip,
-        SevenZip
-    }
-
     public class MachineAuditItem
     {
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string Region { get; set; } = string.Empty;
         public string RomCountSummary { get; set; } = string.Empty;
-        public string Status { get; set; } = "Unknown";
+        public List<string> MissingFiles { get; set; } = new();
 
-        // Returns an Avalonia Brush for UI text color binding
+        // Dynamic color mapping including the new Unknown status
         public IBrush StatusColor => Status switch
         {
-            "Matched" => Brushes.Green,
-            "Broken (Bad Dump)" => Brushes.DarkOrange,
-            _ => Brushes.Red
+            "Complete" => Brushes.LightGreen,
+            "Incomplete" => Brushes.Yellow,
+            "Missing" => Brushes.Red,
+            "Unknown" => Brushes.MediumPurple,
+            _ => Brushes.DarkGray
         };
     }
 
@@ -36,7 +27,24 @@ namespace RomRebuilderUI.Models
     {
         public int TotalFiles { get; set; }
         public int ValidFiles { get; set; }
-        public int MissingFiles { get; set; }
+        public int UnknownFilesCount => UnknownFiles?.Count ?? 0;
         public List<MachineAuditItem> Items { get; set; } = new();
+        public List<string> UnknownFiles { get; set; } = new();
+    }
+
+    public enum RebuildMode
+    {
+        Standard,
+        Full,
+        Merged,
+        Split,
+        NonMerged
+    }
+
+    public enum OutputFormat
+    {
+        Zip,
+        SevenZ,
+        Folder
     }
 }
