@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Security.Cryptography;
+using SharpCompress.Archives;
 
 namespace RomRebuilderUI.Services
 {
@@ -12,7 +12,7 @@ namespace RomRebuilderUI.Services
         public string InternalName { get; set; } = string.Empty;   // Filename inside archive or standalone filename
         public long Size { get; set; }                             // File or entry size in bytes
         public string Hash { get; set; } = string.Empty;           // SHA1 or CRC hash for DAT matching
-        public bool IsArchive { get; set; }                        // True if inside zip/7z, false if loose file
+        public bool IsArchive { get; set; }                        // True if inside an archive, false if loose file
     }
 
     public static class RomScanner
@@ -23,7 +23,7 @@ namespace RomRebuilderUI.Services
         };
 
         /// <summary>
-        /// Recursively scans multiple source directories for both archives (.zip) and loose ROM files across subfolders.
+        /// Recursively scans multiple source directories for archives (.zip, .7z, .rar) and loose ROM files.
         /// </summary>
         public static List<ScannedRomFile> ScanDirectories(IEnumerable<string> sourceDirs)
         {
@@ -37,7 +37,6 @@ namespace RomRebuilderUI.Services
                 if (string.IsNullOrEmpty(sourceDir) || !Directory.Exists(sourceDir))
                     continue;
 
-                // Search recursively through all subdirectories for each folder
                 var allFiles = Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories);
 
                 foreach (var filePath in allFiles)
@@ -46,25 +45,21 @@ namespace RomRebuilderUI.Services
 
                     if (ArchiveExtensions.Contains(ext))
                     {
-                        // Handle compressed archives
                         try
                         {
-                            if (ext.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                            using var archive = ArchiveFactory.OpenArchive(filePath);
+                            foreach (var entry in archive.Entries)
                             {
-                                using var archive = ZipFile.OpenRead(filePath);
-                                foreach (var entry in archive.Entries)
-                                {
-                                    if (string.IsNullOrEmpty(entry.Name)) continue;
+                                if (entry.IsDirectory || string.IsNullOrEmpty(entry.Key)) continue;
 
-                                    discoveredRoms.Add(new ScannedRomFile
-                                    {
-                                        FilePath = filePath,
-                                        InternalName = entry.Name,
-                                        Size = entry.Length,
-                                        IsArchive = true,
-                                        Hash = string.Empty
-                                    });
-                                }
+                                discoveredRoms.Add(new ScannedRomFile
+                                {
+                                    FilePath = filePath,
+                                    InternalName = entry.Key,
+                                    Size = entry.Size,
+                                    IsArchive = true,
+                                    Hash = string.Empty
+                                });
                             }
                         }
                         catch (Exception ex)
@@ -74,7 +69,6 @@ namespace RomRebuilderUI.Services
                     }
                     else
                     {
-                        // Handle unarchived (loose) files
                         try
                         {
                             var fileInfo = new FileInfo(filePath);
@@ -98,7 +92,6 @@ namespace RomRebuilderUI.Services
             return discoveredRoms;
         }
 
-        // Backward compatibility overload for single directory strings
         public static List<ScannedRomFile> ScanDirectory(string sourceDir)
         {
             return ScanDirectories(new[] { sourceDir });
@@ -113,8 +106,9 @@ namespace RomRebuilderUI.Services
                 byte[] hashBytes = sha1.ComputeHash(fs);
                 return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Failed to calculate SHA1 for {filePath}: {ex.Message}");
                 return string.Empty;
             }
         }

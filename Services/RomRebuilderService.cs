@@ -7,6 +7,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using RomRebuilderUI.Models;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 namespace RomRebuilderUI.Services
 {
@@ -200,13 +202,25 @@ namespace RomRebuilderUI.Services
                     string fileToAnalyze = rom.FilePath;
                     long fileSize = rom.Size;
 
-                    if (rom.IsArchive || Path.GetExtension(rom.FilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                    if (rom.IsArchive)
                     {
                         string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath) + "_" + Guid.NewGuid().ToString());
                         Directory.CreateDirectory(extractSubDir);
                         try
                         {
-                            ZipFile.ExtractToDirectory(rom.FilePath, extractSubDir, true);
+                            using var archive = ArchiveFactory.OpenArchive(rom.FilePath);
+                            foreach (var entry in archive.Entries)
+                            {
+                                if (!entry.IsDirectory && !string.IsNullOrEmpty(entry.Key))
+                                {
+                                    entry.WriteToDirectory(extractSubDir, new ExtractionOptions
+                                    {
+                                        ExtractFullPath = true,
+                                        Overwrite = true
+                                    });
+                                }
+                            }
+
                             foreach (var extractedFile in Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories))
                             {
                                 string crc = CalculateCrc32(extractedFile);
@@ -218,7 +232,10 @@ namespace RomRebuilderUI.Services
                                 extractedPathToSourceRomMap[extractedFile] = rom.FilePath;
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Failed to extract archive {rom.FilePath}: {ex.Message}");
+                        }
                     }
                     else
                     {
@@ -410,13 +427,25 @@ namespace RomRebuilderUI.Services
                 foreach (var rom in scannedRoms)
                 {
                     string fileToAnalyze = rom.FilePath;
-                    if (rom.IsArchive || Path.GetExtension(rom.FilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                    if (rom.IsArchive)
                     {
                         string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath) + "_" + Guid.NewGuid().ToString());
                         Directory.CreateDirectory(extractSubDir);
                         try
                         {
-                            ZipFile.ExtractToDirectory(rom.FilePath, extractSubDir, true);
+                            using var archive = ArchiveFactory.OpenArchive(rom.FilePath);
+                            foreach (var entry in archive.Entries)
+                            {
+                                if (!entry.IsDirectory && !string.IsNullOrEmpty(entry.Key))
+                                {
+                                    entry.WriteToDirectory(extractSubDir, new ExtractionOptions
+                                    {
+                                        ExtractFullPath = true,
+                                        Overwrite = true
+                                    });
+                                }
+                            }
+
                             foreach (var extractedFile in Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories))
                             {
                                 string crc = CalculateCrc32(extractedFile);
@@ -434,7 +463,10 @@ namespace RomRebuilderUI.Services
                                 extractedPathToSourceRomMap[extractedFile] = rom.FilePath;
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Failed to extract archive {rom.FilePath}: {ex.Message}");
+                        }
                     }
                     else
                     {
