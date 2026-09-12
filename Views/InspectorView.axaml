@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:RomRebuilderUI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="RomRebuilderUI.Views.InspectorView"
+             x:DataType="vm:InspectorViewModel">
+
+    <Grid RowDefinitions="Auto, *, Auto" Margin="16" RowSpacing="12">
+        <!-- Header & Filter Controls[cite: 1] -->
+        <StackPanel Grid.Row="0" Spacing="8">
+            <TextBlock Text="Deep Audit &amp; Report Inspector" FontSize="20" FontWeight="Bold"/>
+            <Separator/>
+            <Grid ColumnDefinitions="*, 200, Auto, Auto" ColumnSpacing="8">
+                <!-- Replaced Watermark with PlaceholderText[cite: 1] -->
+                <TextBox Grid.Column="0" Text="{Binding SearchFilter, UpdateSourceTrigger=PropertyChanged}" 
+                         PlaceholderText="Search by name or description..."/>
+                <ComboBox Grid.Column="1" ItemsSource="{Binding StatusFilterOptions}" 
+                          SelectedItem="{Binding SelectedStatusFilter}" HorizontalAlignment="Stretch"/>
+                <Button Grid.Column="2" Content="Export Missing" Command="{Binding ExportMissingReportCommand}"/>
+                <Button Grid.Column="3" Content="Export Full" Command="{Binding ExportFullReportCommand}"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- Unified DataGrid for Results[cite: 1] -->
+        <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredAuditItems}" 
+                  SelectedItem="{Binding SelectedItem}"
+                  AutoGenerateColumns="False" IsReadOnly="True"
+                  GridLinesVisibility="All" BorderBrush="#33808080" BorderThickness="1">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120"/>
+                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Bottom Status Bar[cite: 1] -->
+        <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" FontSize="12" Foreground="Gray"/>
+    </Grid>
+</UserControl>

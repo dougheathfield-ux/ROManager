@@ -1,0 +1,246 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:RomRebuilderUI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
+             x:Class="RomRebuilderUI.Views.ConsoleWorkflowView"
+             x:DataType="vm:ConsoleWorkflowViewModel">
+
+    <!-- Root Grid to allow overlaying the "Please Wait" popup -->
+    <Grid>
+        <!-- Vertical Split Layout: Left panel for controls, Right panel for Dashboard -->
+        <Grid ColumnDefinitions="460, 12, *" Margin="16">
+            
+            <!-- LEFT COLUMN: Workflow Controls & Configuration -->
+            <Grid Grid.Column="0" RowDefinitions="*, Auto">
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="14" Margin="0,0,4,0">
+                        <!-- Header -->
+                        <TextBlock Text="Console Manager (1G1R)" FontSize="18" FontWeight="Bold"/>
+                        <Separator/>
+
+                        <!-- 1. DAT File Selection -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="1. Console XML/DAT File" FontWeight="SemiBold" FontSize="13"/>
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0" Text="{Binding ConsoleDatPath}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Browse..." Width="80" Click="OnBrowseDatClick"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 2. Source Directories -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="2. Source ROM Directories" FontWeight="SemiBold" FontSize="13"/>
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                <ListBox Grid.Column="0" Height="85" ItemsSource="{Binding ConsoleSourceDirs}" SelectedItem="{Binding SelectedConsoleSourceDir}"/>
+                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Top">
+                                    <Button Content="Add..." Width="90" Click="OnAddSourceClick"/>
+                                    <Button Content="Remove" Command="{Binding RemoveConsoleSourceCommand}" CommandParameter="{Binding SelectedConsoleSourceDir}" Width="90"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 3. Output Directory Selection -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="3. Output Directory" FontWeight="SemiBold" FontSize="13"/>
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0" Text="{Binding ConsoleOutputDir}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Browse..." Width="80" Click="OnBrowseOutputClick"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <Separator Margin="0,4,0,4"/>
+
+                        <!-- 1G1R & Region Preferences -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="1G1R &amp; Region Preferences" FontWeight="SemiBold" FontSize="13"/>
+                            <CheckBox Content="Enable 1G1R Reduction (1 Game 1 ROM)" IsChecked="{Binding Is1G1REnabled}"/>
+                            <CheckBox Content="Sort Rebuilt ROMs into Region Folders" IsChecked="{Binding IsRegionSortingEnabled}"/>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="24,2,0,4" Spacing="8">
+                                <TextBlock Text="Archive Format:" VerticalAlignment="Center" FontSize="12"/>
+                                <ComboBox Width="95" FontSize="11" 
+                                          ItemsSource="{Binding CompressionFormatOptions}" 
+                                          SelectedItem="{Binding CompressionFormat}"/>
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="110, *" ColumnSpacing="6">
+                                <TextBlock Text="Region Priority:" VerticalAlignment="Center" FontSize="12"/>
+                                <TextBox Grid.Column="1" Text="{Binding RegionPriorities}" 
+                                         ToolTip.Tip="Comma-separated region sequence (e.g., USA, World, Europe, Japan)"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <Separator Margin="0,4,0,4"/>
+
+                        <!-- Operations & Real-Time Statistics -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Operations &amp; Telemetry" FontWeight="SemiBold" FontSize="13"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Run Audit" Command="{Binding AuditConsoleCommand}" IsEnabled="{Binding !IsWorking}" Width="110"/>
+                                <Button Content="Run Rebuild" Command="{Binding RebuildConsoleCommand}" IsEnabled="{Binding !IsWorking}" Width="110"/>
+                            </StackPanel>
+
+                            <!-- Compact Statistics Dashboard Cards -->
+                            <UniformGrid Columns="5" Margin="0, 4, 0, 0">
+                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Scan" FontSize="10" Foreground="Gray" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding TotalScanned}" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Complete" FontSize="10" Foreground="LightGreen" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding MatchedCount}" FontSize="13" FontWeight="Bold" Foreground="LightGreen" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Incomplete" FontSize="10" Foreground="Yellow" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding FilteredDuplicatesCount}" FontSize="13" FontWeight="Bold" Foreground="Yellow" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Missing" FontSize="10" Foreground="Red" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding MissingCount}" FontSize="13" FontWeight="Bold" Foreground="Red" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Unknown" FontSize="10" Foreground="MediumPurple" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding UnknownCount}" FontSize="13" FontWeight="Bold" Foreground="MediumPurple" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Bottom Progress Bar & Status Text -->
+                <Border Grid.Row="1" Padding="0, 8, 0, 0">
+                    <StackPanel Spacing="4">
+                        <ProgressBar Value="{Binding ProgressValue}" 
+                                     Maximum="{Binding ProgressMaximum}" 
+                                     IsIndeterminate="{Binding IsIndeterminate}" 
+                                     Height="5"/>
+                        <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="Gray"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- DIVIDER SEPARATOR -->
+            <Rectangle Grid.Column="1" Fill="#33808080" Width="1" VerticalAlignment="Stretch"/>
+
+            <!-- RIGHT COLUMN: Collection Dashboard & Audit Results -->
+            <Border Grid.Column="2" BorderBrush="#33808080" BorderThickness="1" CornerRadius="6" Background="#161616" Padding="12">
+                <Grid RowDefinitions="Auto, Auto, *, 120, Auto">
+                    
+                    <!-- 1. TOP SECTION: Health Overview -->
+                    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                        <Grid>
+                            <TextBlock Text="Collection Health Dashboard" FontSize="15" FontWeight="Bold" HorizontalAlignment="Left"/>
+                            <TextBlock Text="{Binding CollectionHealthText}" FontSize="14" FontWeight="SemiBold" Foreground="LightGreen" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <ProgressBar Value="{Binding CollectionHealthPercentage}" Maximum="100" Height="8" Foreground="LightGreen"/>
+                        <UniformGrid Columns="4" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding MatchedCount, StringFormat='Complete: {0}'}" Foreground="LightGreen" FontSize="11"/>
+                            <TextBlock Text="{Binding FilteredDuplicatesCount, StringFormat='Incomplete: {0}'}" Foreground="Yellow" FontSize="11"/>
+                            <TextBlock Text="{Binding MissingCount, StringFormat='Missing: {0}'}" Foreground="Red" FontSize="11"/>
+                            <TextBlock Text="{Binding UnknownCount, StringFormat='Unknown: {0}'}" Foreground="MediumPurple" FontSize="11"/>
+                        </UniformGrid>
+                    </StackPanel>
+
+                    <Separator Grid.Row="1" Margin="0,0,0,8"/>
+
+                    <!-- 2. MIDDLE SECTION: Sets Explorer with Filter Dropdown -->
+                    <Grid Grid.Row="2" RowDefinitions="Auto, *" Margin="0,0,0,8">
+                        <Grid Grid.Row="0" Margin="0,0,0,6">
+                            <TextBlock Text="Sets Explorer" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
+                                <TextBlock Text="Filter:" FontSize="11" Foreground="DarkGray" VerticalAlignment="Center"/>
+                                <ComboBox Width="120" FontSize="11" 
+                                          ItemsSource="{Binding StatusFilterOptions}" 
+                                          SelectedItem="{Binding SelectedStatusFilter}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <DataGrid Grid.Row="1" 
+                                  ItemsSource="{Binding ConsoleAuditItems}" 
+                                  SelectedItem="{Binding SelectedAuditItem}"
+                                  AutoGenerateColumns="False" 
+                                  IsReadOnly="True"
+                                  CanUserSortColumns="True" 
+                                  CanUserResizeColumns="True"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  Background="#1E1E1E"
+                                  Foreground="White">
+                            <DataGrid.Styles>
+                                <Style Selector="DataGridCell">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Style>
+                            </DataGrid.Styles>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Game / System Name" Binding="{Binding Name}" Width="*"/>
+                                
+                                <!-- Color-coded Status Column -->
+                                <DataGridTemplateColumn Header="Status" Width="95" SortMemberPath="Status">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Status}" 
+                                                       Foreground="{Binding StatusColor}" 
+                                                       VerticalAlignment="Center" 
+                                                       Margin="12,0"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTextColumn Header="Region" Binding="{Binding Region}" Width="Auto"/>
+                                <DataGridTextColumn Header="Missing Files" Binding="{Binding RomCountSummary}" Width="Auto"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+
+                    <!-- 3. BOTTOM SECTION: Missing Files Drill-Down Inspector -->
+                    <Border Grid.Row="3" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Background="#121212" Padding="8" Margin="0,8,0,0">
+                        <Grid RowDefinitions="Auto, *">
+                            <TextBlock Grid.Row="0" Text="{Binding SelectedAuditItem.Name, StringFormat='Missing Files for: {0}'}" FontWeight="SemiBold" FontSize="11" Foreground="DarkGray" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedAuditItem.MissingFiles}" Background="Transparent" BorderThickness="0" FontSize="11">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="IndianRed"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- 4. ACTIONS: Export Missing List -->
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                        <Button Content="Export Missing List..." Command="{Binding ExportMissingListCommand}" Width="160" IsEnabled="{Binding HasAuditItems}"/>
+                    </StackPanel>
+
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- PLEASE WAIT OVERLAY -->
+        <Border Background="#A0000000" IsVisible="{Binding IsWorking}" ZIndex="999">
+            <Border HorizontalAlignment="Center" 
+                    VerticalAlignment="Center" 
+                    Background="#222222" 
+                    Padding="32,24" 
+                    CornerRadius="8" 
+                    BorderBrush="#44808080" 
+                    BorderThickness="1">
+                <StackPanel Spacing="14">
+                    <ProgressBar IsIndeterminate="True" Width="240" Height="6" Foreground="DodgerBlue"/>
+                    <TextBlock Text="Please wait, scanning source ROM files..." FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="DarkGray" HorizontalAlignment="Center" MaxWidth="300" TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</UserControl>
