@@ -126,7 +126,10 @@
                                      Maximum="{Binding ProgressMaximum}" 
                                      IsIndeterminate="{Binding IsIndeterminate}" 
                                      Height="5"/>
-                        <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="Gray"/>
+                        <Grid>
+                            <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="Gray" HorizontalAlignment="Left"/>
+                            <TextBlock Text="{Binding RebuildElapsedTime, StringFormat='Elapsed: {0}'}" FontSize="11" Foreground="Gray" HorizontalAlignment="Right"/>
+                        </Grid>
                     </StackPanel>
                 </Border>
             </Grid>

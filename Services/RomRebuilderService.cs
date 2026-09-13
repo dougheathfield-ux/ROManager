@@ -25,6 +25,7 @@ namespace RomRebuilderUI.Services
         public int Moved { get; set; }
         public int Failed { get; set; }
         public int UnknownFilesHandled { get; set; }
+        public TimeSpan ElapsedTime { get; set; }
     }
 
     public class RomRebuilderService
@@ -48,11 +49,10 @@ namespace RomRebuilderUI.Services
             return table;
         }
 
-        private string CalculateCrc32(string filePath)
+        public string CalculateCrc32(Stream fs)
         {
             try
             {
-                using var fs = File.OpenRead(filePath);
                 uint crc = 0xffffffff;
                 byte[] buffer = new byte[8192];
                 int count;
@@ -64,6 +64,19 @@ namespace RomRebuilderUI.Services
                     }
                 }
                 return (~crc).ToString("X8");
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private string CalculateCrc32(string filePath)
+        {
+            try
+            {
+                using var fs = File.OpenRead(filePath);
+                return CalculateCrc32(fs);
             }
             catch
             {
@@ -365,10 +378,14 @@ namespace RomRebuilderUI.Services
 
         public async Task<RebuildResult> RebuildConsoleSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, bool sortIntoRegionFolders, OutputFormat format, string actualDatPath, IProgress<RebuildProgressReport>? progress)
         {
+            var stopwatch = Stopwatch.StartNew();
             var result = new RebuildResult();
+            
             if (string.IsNullOrEmpty(outputDir))
             {
                 progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: Output directory is not specified." });
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
                 return result;
             }
 
@@ -376,6 +393,8 @@ namespace RomRebuilderUI.Services
             if (validDirs.Count == 0)
             {
                 progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No valid Source Directories specified." });
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
                 return result;
             }
 
@@ -403,6 +422,8 @@ namespace RomRebuilderUI.Services
             if (consoleGames.Count == 0)
             {
                 progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No games found in DAT definitions." });
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
                 return result;
             }
 
@@ -652,6 +673,9 @@ namespace RomRebuilderUI.Services
                 {
                     try { Directory.Delete(tempRoot, true); } catch { }
                 }
+
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
             }
 
             return result;

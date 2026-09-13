@@ -7,5 +7,5 @@
   "Is1G1REnabled": false,
   "IsRegionSortingEnabled": false,
   "RegionPriorities": "USA, World, Europe, Japan, Other",
-  "CompressionFormat": ".7z"
+  "CompressionFormat": ".zip"
 }
