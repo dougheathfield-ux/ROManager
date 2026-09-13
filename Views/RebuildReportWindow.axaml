@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:RomRebuilderUI.Models"
+        x:Class="RomRebuilderUI.Views.RebuildReportWindow"
+        x:DataType="models:RebuildReportModel"
+        Title="Rebuild Complete - Report" Width="450" Height="400"
+        WindowStartupLocation="CenterOwner" CanResize="False">
+    <StackPanel Margin="20" Spacing="15">
+        <TextBlock Text="Rebuild &amp; Audit Report" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+        
+        <Border Background="#222" CornerRadius="8" Padding="15">
+            <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Text="Total Files/Sets Processed:" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="{Binding TotalProcessed}"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Text="Successfully Rebuilt/Moved:" Foreground="LightGreen" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="{Binding SuccessfulMoves}" Foreground="LightGreen"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Text="Failed Operations:" Foreground="IndianRed" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="{Binding FailedCount}" Foreground="IndianRed"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Text="Bad Dumps / Fixed:" />
+                    <TextBlock Grid.Column="1" Text="{Binding BadDumpsCount}"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Text="Unknown Files Found:" />
+                    <TextBlock Grid.Column="1" Text="{Binding UnknownCount}"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Text="Elapsed Time:" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="{Binding ElapsedTime}"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Button Content="Close" HorizontalAlignment="Center" Width="100" Click="CloseButton_Click"/>
+    </StackPanel>
+</Window>

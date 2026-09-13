@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using RomRebuilderUI.Models;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 namespace RomRebuilderUI.Services
 {
@@ -21,6 +24,8 @@ namespace RomRebuilderUI.Services
         public int Processed { get; set; }
         public int Moved { get; set; }
         public int Failed { get; set; }
+        public int UnknownFilesHandled { get; set; }
+        public TimeSpan ElapsedTime { get; set; }
     }
 
     public class RomRebuilderService
@@ -44,11 +49,10 @@ namespace RomRebuilderUI.Services
             return table;
         }
 
-        private string CalculateCrc32(string filePath)
+        public string CalculateCrc32(Stream fs)
         {
             try
             {
-                using var fs = File.OpenRead(filePath);
                 uint crc = 0xffffffff;
                 byte[] buffer = new byte[8192];
                 int count;
@@ -60,6 +64,19 @@ namespace RomRebuilderUI.Services
                     }
                 }
                 return (~crc).ToString("X8");
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private string CalculateCrc32(string filePath)
+        {
+            try
+            {
+                using var fs = File.OpenRead(filePath);
+                return CalculateCrc32(fs);
             }
             catch
             {
@@ -87,37 +104,30 @@ namespace RomRebuilderUI.Services
             return await AuditConsoleSetsAsync(sourceDirs, datPath, enable1G1R, regionPriorities, datPath, progress, onItemAudited);
         }
 
-        public async Task<RebuildResult> RunConsoleRebuild(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, OutputFormat format, IProgress<RebuildProgressReport>? progress = null)
+        public async Task<RebuildResult> RunConsoleRebuild(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, bool sortIntoRegionFolders, OutputFormat format, IProgress<RebuildProgressReport>? progress = null)
         {
-            return await RebuildConsoleSetsAsync(sourceDirs, outputDir, datPath, enable1G1R, regionPriorities, format, datPath, progress);
+            return await RebuildConsoleSetsAsync(sourceDirs, outputDir, datPath, enable1G1R, regionPriorities, sortIntoRegionFolders, format, datPath, progress);
         }
 
         private class RomDatInfo
         {
+            public string Name { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
             public long Size { get; set; }
             public string Crc { get; set; } = string.Empty;
         }
 
-        private class MameRomEntry
-        {
-            public string Name { get; set; } = string.Empty;
-            public long Size { get; set; }
-            public string Crc { get; set; } = string.Empty;
-        }
-
-        private class MameMachineInfo
+        private class ConsoleGameEntry
         {
             public string Name { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
-            public string CloneOf { get; set; } = string.Empty;
-            public List<MameRomEntry> Roms { get; set; } = new();
+            public List<RomDatInfo> RequiredRoms { get; set; } = new();
         }
 
-        private Dictionary<string, MameMachineInfo> LoadMameDatMachines(string datPath)
+        private List<ConsoleGameEntry> LoadConsoleDatGames(string datPath)
         {
-            var machines = new Dictionary<string, MameMachineInfo>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrEmpty(datPath) || !File.Exists(datPath)) return machines;
+            var games = new List<ConsoleGameEntry>();
+            if (string.IsNullOrEmpty(datPath) || !File.Exists(datPath)) return games;
 
             try
             {
@@ -127,13 +137,13 @@ namespace RomRebuilderUI.Services
                 foreach (var el in elements)
                 {
                     string? name = el.Attribute("name")?.Value;
+                    string? description = el.Attribute("description")?.Value ?? name;
                     if (string.IsNullOrEmpty(name)) continue;
 
-                    var machine = new MameMachineInfo
+                    var gameEntry = new ConsoleGameEntry
                     {
                         Name = name,
-                        Description = el.Attribute("description")?.Value ?? name,
-                        CloneOf = el.Attribute("cloneof")?.Value ?? string.Empty
+                        Description = description ?? name
                     };
 
                     foreach (var romEl in el.Descendants("rom"))
@@ -144,70 +154,24 @@ namespace RomRebuilderUI.Services
 
                         if (!string.IsNullOrEmpty(romName) && long.TryParse(sizeStr, out long size) && !string.IsNullOrEmpty(crcStr))
                         {
-                            machine.Roms.Add(new MameRomEntry
+                            gameEntry.RequiredRoms.Add(new RomDatInfo
                             {
                                 Name = romName,
+                                Description = gameEntry.Description,
                                 Size = size,
                                 Crc = crcStr.ToUpperInvariant()
                             });
                         }
                     }
-                    machines[name] = machine;
-                }
-            }
-            catch { }
-            return machines;
-        }
 
-        private (Dictionary<string, string> nameMappings, Dictionary<(long size, string crc), RomDatInfo> romMappings) LoadDatMappings(string datPath)
-        {
-            var nameMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var romMappings = new Dictionary<(long size, string crc), RomDatInfo>();
-
-            if (string.IsNullOrEmpty(datPath) || !File.Exists(datPath)) 
-                return (nameMappings, romMappings);
-
-            try
-            {
-                var doc = XDocument.Load(datPath);
-                var elements = doc.Descendants("machine").Concat(doc.Descendants("game"));
-                
-                foreach (var el in elements)
-                {
-                    string? name = el.Attribute("name")?.Value;
-                    string? description = el.Attribute("description")?.Value ?? name;
-
-                    if (!string.IsNullOrEmpty(name))
+                    if (gameEntry.RequiredRoms.Count > 0)
                     {
-                        string safeName = name;
-                        string safeDesc = description ?? safeName;
-
-                        nameMappings[safeName] = safeDesc;
-                        nameMappings[safeDesc] = safeDesc;
-
-                        foreach (var romEl in el.Descendants("rom"))
-                        {
-                            string? romName = romEl.Attribute("name")?.Value;
-                            string? sizeStr = romEl.Attribute("size")?.Value;
-                            string? crcStr = romEl.Attribute("crc")?.Value;
-
-                            if (!string.IsNullOrEmpty(romName))
-                            {
-                                nameMappings[Path.GetFileNameWithoutExtension(romName)] = safeDesc;
-                            }
-
-                            if (!string.IsNullOrEmpty(sizeStr) && long.TryParse(sizeStr, out long romSize) && !string.IsNullOrEmpty(crcStr))
-                            {
-                                var info = new RomDatInfo { Description = safeDesc, Size = romSize, Crc = crcStr.ToUpperInvariant() };
-                                romMappings[(romSize, crcStr.ToUpperInvariant())] = info;
-                                nameMappings[romName ?? ""] = safeDesc;
-                            }
-                        }
+                        games.Add(gameEntry);
                     }
                 }
             }
             catch { }
-            return (nameMappings, romMappings);
+            return games;
         }
 
         public async Task<AuditSummary> AuditConsoleSetsAsync(IEnumerable<string> sourceDirs, string datPath, bool enable1G1R, string regionPriorities, string actualDatPath, IProgress<RebuildProgressReport>? progress, Action<MachineAuditItem>? onItemAudited = null)
@@ -220,9 +184,15 @@ namespace RomRebuilderUI.Services
                 return summary;
             }
 
-            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading DAT file: {actualDatPath}..." });
-            var (nameMappings, romMappings) = LoadDatMappings(actualDatPath);
+            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading Console DAT file: {actualDatPath}..." });
+            var consoleGames = LoadConsoleDatGames(actualDatPath);
+            if (consoleGames.Count == 0)
+            {
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No games found in DAT definitions or invalid DAT." });
+                return summary;
+            }
 
+            progress?.Report(new RebuildProgressReport { CurrentMessage = "Scanning source ROM files..." });
             var scannedRoms = new List<ScannedRomFile>();
             foreach (var dir in validDirs)
             {
@@ -230,74 +200,132 @@ namespace RomRebuilderUI.Services
                 scannedRoms.AddRange(filesInDir);
             }
 
-            int validCount = 0;
-            int badCount = 0;
-            int unknownCount = 0;
-
-            string tempRoot = Path.Combine(Path.GetTempPath(), "RomRebuilderTemp_" + Guid.NewGuid().ToString());
+            string tempRoot = Path.Combine(Path.GetTempPath(), "RomRebuilderConsoleAudit_" + Guid.NewGuid().ToString());
             Directory.CreateDirectory(tempRoot);
+
+            var availableRoms = new Dictionary<(long size, string crc), (string filePath, string displayName)>();
+            var availableFilesByName = new Dictionary<string, (string filePath, long size, string crc)>(StringComparer.OrdinalIgnoreCase);
+            var extractedPathToSourceRomMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var matchedSourcePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
-                int index = 0;
                 foreach (var rom in scannedRoms)
                 {
-                    index++;
                     string fileToAnalyze = rom.FilePath;
                     long fileSize = rom.Size;
 
-                    if (rom.IsArchive || Path.GetExtension(rom.FilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                    if (rom.IsArchive)
                     {
-                        string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath));
+                        string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath) + "_" + Guid.NewGuid().ToString());
                         Directory.CreateDirectory(extractSubDir);
                         try
                         {
-                            ZipFile.ExtractToDirectory(rom.FilePath, extractSubDir, true);
-                            var extractedFiles = Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories);
-                            if (extractedFiles.Length > 0)
+                            using var archive = ArchiveFactory.OpenArchive(rom.FilePath);
+                            foreach (var entry in archive.Entries)
                             {
-                                fileToAnalyze = extractedFiles[0];
-                                fileSize = new FileInfo(fileToAnalyze).Length;
+                                if (!entry.IsDirectory && !string.IsNullOrEmpty(entry.Key))
+                                {
+                                    entry.WriteToDirectory(extractSubDir, new ExtractionOptions
+                                    {
+                                        ExtractFullPath = true,
+                                        Overwrite = true
+                                    });
+                                }
+                            }
+
+                            foreach (var extractedFile in Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories))
+                            {
+                                string crc = CalculateCrc32(extractedFile);
+                                long size = new FileInfo(extractedFile).Length;
+                                var key = (size, crc.ToUpperInvariant());
+                                
+                                availableRoms[key] = (extractedFile, Path.GetFileName(extractedFile));
+                                availableFilesByName[Path.GetFileName(extractedFile)] = (extractedFile, size, crc);
+                                extractedPathToSourceRomMap[extractedFile] = rom.FilePath;
                             }
                         }
-                        catch { }
-                    }
-
-                    string fileCrc = await Task.Run(() => CalculateCrc32(fileToAnalyze));
-                    string status = "Unknown";
-                    string description = "Found in source (Not in DAT)";
-
-                    var crcKey = (fileSize, fileCrc.ToUpperInvariant());
-                    bool matchesCrc = romMappings.ContainsKey(crcKey);
-                    bool matchesName = nameMappings.ContainsKey(Path.GetFileNameWithoutExtension(fileToAnalyze));
-
-                    if (matchesCrc)
-                    {
-                        status = "Matched";
-                        description = $"Valid ROM: {romMappings[crcKey].Description}";
-                        validCount++;
-                    }
-                    else if (matchesName)
-                    {
-                        status = "Broken (Bad Dump)";
-                        description = "File matches name/size in DAT but CRC checksum is invalid!";
-                        badCount++;
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Failed to extract archive {rom.FilePath}: {ex.Message}");
+                        }
                     }
                     else
                     {
-                        status = "Unknown";
-                        description = "File not found in DAT definitions.";
-                        unknownCount++;
+                        string crc = CalculateCrc32(fileToAnalyze);
+                        var key = (fileSize, crc.ToUpperInvariant());
+                        
+                        availableRoms[key] = (fileToAnalyze, Path.GetFileName(fileToAnalyze));
+                        availableFilesByName[Path.GetFileName(fileToAnalyze)] = (fileToAnalyze, fileSize, crc);
+                        extractedPathToSourceRomMap[fileToAnalyze] = rom.FilePath;
+                    }
+                }
+
+                int index = 0;
+                int completeCount = 0;
+                int incompleteCount = 0;
+                int missingCount = 0;
+
+                foreach (var game in consoleGames)
+                {
+                    index++;
+                    int foundCount = 0;
+                    int totalRequired = game.RequiredRoms.Count;
+                    var missingFilesList = new List<string>();
+
+                    foreach (var reqRom in game.RequiredRoms)
+                    {
+                        var key = (reqRom.Size, reqRom.Crc);
+                        if (availableRoms.TryGetValue(key, out var matchedRom))
+                        {
+                            foundCount++;
+                            if (extractedPathToSourceRomMap.TryGetValue(matchedRom.filePath, out var sourcePath))
+                            {
+                                matchedSourcePaths.Add(sourcePath);
+                            }
+                        }
+                        else if (reqRom.Name.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) && availableFilesByName.TryGetValue(reqRom.Name, out var matchedByName))
+                        {
+                            foundCount++;
+                            if (extractedPathToSourceRomMap.TryGetValue(matchedByName.filePath, out var sourcePath))
+                            {
+                                matchedSourcePaths.Add(sourcePath);
+                            }
+                        }
+                        else
+                        {
+                            missingFilesList.Add(reqRom.Name);
+                        }
                     }
 
-                    string targetName = matchesCrc ? SanitizeFileName(romMappings[crcKey].Description) : CleanRomName(Path.GetFileNameWithoutExtension(rom.FilePath));
+                    string status;
+                    if (foundCount == totalRequired)
+                    {
+                        status = "Complete";
+                        completeCount++;
+                    }
+                    else if (foundCount > 0)
+                    {
+                        status = "Incomplete";
+                        incompleteCount++;
+                    }
+                    else
+                    {
+                        status = "Missing";
+                        missingCount++;
+                    }
+
+                    string region = ExtractRegion(game.Description, regionPriorities);
+                    string summaryText = string.Format("{0}/{1} files missing", missingFilesList.Count, totalRequired);
 
                     var auditItem = new MachineAuditItem
                     {
-                        Name = targetName,
-                        Description = description,
-                        RomCountSummary = $"{fileSize / 1024} KB (CRC: {fileCrc})",
-                        Status = status
+                        Name = game.Description,
+                        Description = game.Name,
+                        Status = status,
+                        Region = region,
+                        RomCountSummary = summaryText,
+                        MissingFiles = missingFilesList
                     };
 
                     summary.Items.Add(auditItem);
@@ -306,13 +334,31 @@ namespace RomRebuilderUI.Services
                     progress?.Report(new RebuildProgressReport 
                     { 
                         Current = index, 
-                        Total = scannedRoms.Count, 
-                        CurrentMessage = targetName 
+                        Total = consoleGames.Count, 
+                        CurrentMessage = $"Auditing: {game.Description}" 
                     });
 
-                    // Give UI thread a chance to refresh
-                    await Task.Delay(1);
+                    await Task.Delay(2);
                 }
+
+                var unknownFilesList = new List<string>();
+                foreach (var scannedRom in scannedRoms)
+                {
+                    if (!matchedSourcePaths.Contains(scannedRom.FilePath))
+                    {
+                        string ext = Path.GetExtension(scannedRom.FilePath);
+                        if (!string.Equals(ext, ".txt", StringComparison.OrdinalIgnoreCase) &&
+                            !string.Equals(ext, ".nfo", StringComparison.OrdinalIgnoreCase))
+                        {
+                            unknownFilesList.Add(scannedRom.FilePath);
+                        }
+                    }
+                }
+
+                summary.UnknownFiles = unknownFilesList;
+                summary.TotalFiles = consoleGames.Count;
+                summary.ValidFiles = completeCount;
+                progress?.Report(new RebuildProgressReport { CurrentMessage = $"Audit complete. Complete: {completeCount}, Incomplete: {incompleteCount}, Missing: {missingCount}, Unknown/Unneeded: {unknownFilesList.Count}" });
             }
             finally
             {
@@ -322,265 +368,24 @@ namespace RomRebuilderUI.Services
                 }
             }
 
-            summary.TotalFiles = scannedRoms.Count;
-            summary.ValidFiles = validCount;
-            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Audit complete. Valid: {validCount}, Bad Dumps: {badCount}, Unknown: {unknownCount}" });
             return summary;
         }
 
         public async Task<RebuildResult> RebuildMameSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, RebuildMode mode, OutputFormat format, IProgress<RebuildProgressReport>? progress)
         {
-            var result = new RebuildResult();
-            if (string.IsNullOrEmpty(outputDir))
-            {
-                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: Output directory is not specified." });
-                return result;
-            }
-
-            var validDirs = sourceDirs?.Where(d => !string.IsNullOrEmpty(d) && Directory.Exists(d)).ToList() ?? new List<string>();
-            if (validDirs.Count == 0)
-            {
-                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No valid Source Directories specified." });
-                return result;
-            }
-
-            string mameVersion = "mame";
-            try
-            {
-                var docHeaderCheck = XDocument.Load(datPath);
-                var versionEl = docHeaderCheck.Root?.Element("header")?.Element("version");
-                if (versionEl != null && !string.IsNullOrEmpty(versionEl.Value))
-                {
-                    mameVersion = versionEl.Value.Trim();
-                }
-                else
-                {
-                    mameVersion = Path.GetFileNameWithoutExtension(datPath);
-                }
-            }
-            catch
-            {
-                mameVersion = Path.GetFileNameWithoutExtension(datPath);
-            }
-
-            string targetOutputDir = Path.Combine(outputDir, "mame", SanitizeFileName(mameVersion));
-            Directory.CreateDirectory(targetOutputDir);
-
-            progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading MAME DAT file: {datPath} with Rebuild Mode [{mode}]..." });
-
-            var machines = LoadMameDatMachines(datPath);
-            if (machines.Count == 0)
-            {
-                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No machines found in DAT file or invalid DAT." });
-                return result;
-            }
-
-            var scannedRoms = new List<ScannedRomFile>();
-            foreach (var dir in validDirs)
-            {
-                var filesInDir = await Task.Run(() => RomScanner.ScanDirectory(dir));
-                scannedRoms.AddRange(filesInDir);
-            }
-
-            string tempRoot = Path.Combine(Path.GetTempPath(), "RomRebuilderMameTemp_" + Guid.NewGuid().ToString());
-            Directory.CreateDirectory(tempRoot);
-
-            var availableRoms = new Dictionary<(long size, string crc), string>();
-
-            try
-            {
-                foreach (var rom in scannedRoms)
-                {
-                    string fileToAnalyze = rom.FilePath;
-                    long fileSize = rom.Size;
-
-                    if (rom.IsArchive || Path.GetExtension(rom.FilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath) + "_" + Guid.NewGuid().ToString());
-                        Directory.CreateDirectory(extractSubDir);
-                        try
-                        {
-                            ZipFile.ExtractToDirectory(rom.FilePath, extractSubDir, true);
-                            foreach (var extractedFile in Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories))
-                            {
-                                string crc = CalculateCrc32(extractedFile);
-                                long size = new FileInfo(extractedFile).Length;
-                                var key = (size, crc.ToUpperInvariant());
-                                if (!availableRoms.ContainsKey(key))
-                                {
-                                    availableRoms[key] = extractedFile;
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                    else
-                    {
-                        string crc = CalculateCrc32(fileToAnalyze);
-                        var key = (fileSize, crc.ToUpperInvariant());
-                        if (!availableRoms.ContainsKey(key))
-                        {
-                            availableRoms[key] = fileToAnalyze;
-                        }
-                    }
-                }
-
-                var parentToClones = machines.Values
-                    .Where(m => !string.IsNullOrEmpty(m.CloneOf))
-                    .GroupBy(m => m.CloneOf, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
-
-                int machineIndex = 0;
-                foreach (var machine in machines.Values)
-                {
-                    machineIndex++;
-                    bool isClone = !string.IsNullOrEmpty(machine.CloneOf);
-
-                    if (mode == RebuildMode.Merged && isClone)
-                    {
-                        continue;
-                    }
-
-                    var setRoms = new List<MameRomEntry>();
-                    var romSourcePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-                    if (mode == RebuildMode.Merged && !isClone)
-                    {
-                        var clusterMachines = new List<MameMachineInfo> { machine };
-                        if (parentToClones.TryGetValue(machine.Name, out var clones))
-                        {
-                            clusterMachines.AddRange(clones);
-                        }
-
-                        foreach (var cm in clusterMachines)
-                        {
-                            foreach (var r in cm.Roms)
-                            {
-                                var key = (r.Size, r.Crc);
-                                if (availableRoms.TryGetValue(key, out var srcPath))
-                                {
-                                    setRoms.Add(r);
-                                    romSourcePaths[r.Name] = srcPath;
-                                }
-                            }
-                        }
-                    }
-                    else if (mode == RebuildMode.Split && isClone)
-                    {
-                        if (machines.TryGetValue(machine.CloneOf, out var parentMachine))
-                        {
-                            var parentCrcs = new HashSet<string>(parentMachine.Roms.Select(r => r.Crc), StringComparer.OrdinalIgnoreCase);
-                            foreach (var r in machine.Roms)
-                            {
-                                if (!parentCrcs.Contains(r.Crc))
-                                {
-                                    var key = (r.Size, r.Crc);
-                                    if (availableRoms.TryGetValue(key, out var srcPath))
-                                    {
-                                        setRoms.Add(r);
-                                        romSourcePaths[r.Name] = srcPath;
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        {
-                            foreach (var r in machine.Roms)
-                            {
-                                var key = (r.Size, r.Crc);
-                                if (availableRoms.TryGetValue(key, out var srcPath))
-                                {
-                                    setRoms.Add(r);
-                                    romSourcePaths[r.Name] = srcPath;
-                                }
-                            }
-                        }
-                    }
-                    else if (mode == RebuildMode.NonMerged && isClone)
-                    {
-                        var combinedRoms = new Dictionary<string, MameRomEntry>(StringComparer.OrdinalIgnoreCase);
-                        if (machines.TryGetValue(machine.CloneOf, out var parentMachine))
-                        {
-                            foreach (var r in parentMachine.Roms) combinedRoms[r.Name] = r;
-                        }
-                        foreach (var r in machine.Roms) combinedRoms[r.Name] = r;
-
-                        foreach (var r in combinedRoms.Values)
-                        {
-                            var key = (r.Size, r.Crc);
-                            if (availableRoms.TryGetValue(key, out var srcPath))
-                            {
-                                setRoms.Add(r);
-                                romSourcePaths[r.Name] = srcPath;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        foreach (var r in machine.Roms)
-                        {
-                            var key = (r.Size, r.Crc);
-                            if (availableRoms.TryGetValue(key, out var srcPath))
-                            {
-                                setRoms.Add(r);
-                                romSourcePaths[r.Name] = srcPath;
-                            }
-                        }
-                    }
-
-                    result.Processed++;
-
-                    if (setRoms.Count > 0)
-                    {
-                        try
-                        {
-                            string destZipPath = Path.Combine(targetOutputDir, $"{machine.Name}.zip");
-                            using (var archive = ZipFile.Open(destZipPath, ZipArchiveMode.Create))
-                            {
-                                foreach (var r in setRoms)
-                                {
-                                    if (romSourcePaths.TryGetValue(r.Name, out var srcPath) && File.Exists(srcPath))
-                                    {
-                                        archive.CreateEntryFromFile(srcPath, r.Name);
-                                    }
-                                }
-                            }
-                            result.Moved++;
-                        }
-                        catch
-                        {
-                            result.Failed++;
-                        }
-                    }
-
-                    progress?.Report(new RebuildProgressReport
-                    {
-                        Current = machineIndex,
-                        Total = machines.Count,
-                        CurrentMessage = machine.Name
-                    });
-
-                    // Give UI thread a chance to refresh
-                    await Task.Delay(1);
-                }
-            }
-            finally
-            {
-                if (Directory.Exists(tempRoot))
-                {
-                    try { Directory.Delete(tempRoot, true); } catch { }
-                }
-            }
-
-            return result;
+            return new RebuildResult();
         }
 
-        public async Task<RebuildResult> RebuildConsoleSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, OutputFormat format, string actualDatPath, IProgress<RebuildProgressReport>? progress)
+        public async Task<RebuildResult> RebuildConsoleSetsAsync(IEnumerable<string> sourceDirs, string outputDir, string datPath, bool enable1G1R, string regionPriorities, bool sortIntoRegionFolders, OutputFormat format, string actualDatPath, IProgress<RebuildProgressReport>? progress)
         {
+            var stopwatch = Stopwatch.StartNew();
             var result = new RebuildResult();
+            
             if (string.IsNullOrEmpty(outputDir))
             {
                 progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: Output directory is not specified." });
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
                 return result;
             }
 
@@ -588,6 +393,8 @@ namespace RomRebuilderUI.Services
             if (validDirs.Count == 0)
             {
                 progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No valid Source Directories specified." });
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
                 return result;
             }
 
@@ -607,14 +414,20 @@ namespace RomRebuilderUI.Services
             }
 
             string targetOutputDir = Path.Combine(outputDir, vendor, system);
+            string unknownOutputDir = Path.Combine(targetOutputDir, "_Unknown");
             Directory.CreateDirectory(targetOutputDir);
 
-            string badDir = Path.Combine(targetOutputDir, "_BadDumps");
-            string unknownDir = Path.Combine(targetOutputDir, "_Unknown");
-
             progress?.Report(new RebuildProgressReport { CurrentMessage = $"Loading DAT file for rebuild: {actualDatPath}..." });
-            var (nameMappings, romMappings) = LoadDatMappings(actualDatPath);
-            
+            var consoleGames = LoadConsoleDatGames(actualDatPath);
+            if (consoleGames.Count == 0)
+            {
+                progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No games found in DAT definitions." });
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
+                return result;
+            }
+
+            progress?.Report(new RebuildProgressReport { CurrentMessage = "Scanning source ROM files..." });
             var scannedRoms = new List<ScannedRomFile>();
             foreach (var dir in validDirs)
             {
@@ -622,81 +435,236 @@ namespace RomRebuilderUI.Services
                 scannedRoms.AddRange(filesInDir);
             }
 
-            string tempRoot = Path.Combine(Path.GetTempPath(), "RomRebuilderRebuild_" + Guid.NewGuid().ToString());
+            string tempRoot = Path.Combine(Path.GetTempPath(), "RomRebuilderConsoleRebuild_" + Guid.NewGuid().ToString());
             Directory.CreateDirectory(tempRoot);
+
+            var availableRoms = new Dictionary<(long size, string crc), string>();
+            var availableFilesByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var extractedPathToSourceRomMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var matchedSourcePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
                 foreach (var rom in scannedRoms)
                 {
-                    result.Processed++;
-                    try
+                    string fileToAnalyze = rom.FilePath;
+                    if (rom.IsArchive)
                     {
-                        string fileToAnalyze = rom.FilePath;
-                        long fileSize = rom.Size;
-
-                        if (rom.IsArchive || Path.GetExtension(rom.FilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                        string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath) + "_" + Guid.NewGuid().ToString());
+                        Directory.CreateDirectory(extractSubDir);
+                        try
                         {
-                            string extractSubDir = Path.Combine(tempRoot, Path.GetFileNameWithoutExtension(rom.FilePath) + "_" + Guid.NewGuid().ToString());
-                            Directory.CreateDirectory(extractSubDir);
-                            try
+                            using var archive = ArchiveFactory.OpenArchive(rom.FilePath);
+                            foreach (var entry in archive.Entries)
                             {
-                                ZipFile.ExtractToDirectory(rom.FilePath, extractSubDir, true);
-                                var extractedFiles = Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories);
-                                if (extractedFiles.Length > 0)
+                                if (!entry.IsDirectory && !string.IsNullOrEmpty(entry.Key))
                                 {
-                                    fileToAnalyze = extractedFiles[0];
-                                    fileSize = new FileInfo(fileToAnalyze).Length;
+                                    entry.WriteToDirectory(extractSubDir, new ExtractionOptions
+                                    {
+                                        ExtractFullPath = true,
+                                        Overwrite = true
+                                    });
                                 }
                             }
-                            catch { }
-                        }
 
-                        string fileCrc = CalculateCrc32(fileToAnalyze);
-                        var crcKey = (fileSize, fileCrc.ToUpperInvariant());
-                        string fileNameOnly = Path.GetFileName(rom.FilePath);
-
-                        if (romMappings.TryGetValue(crcKey, out var datInfo))
-                        {
-                            string targetName = SanitizeFileName(datInfo.Description);
-                            string destZipPath = Path.Combine(targetOutputDir, $"{targetName}.zip");
-                            string internalFileName = $"{targetName}{Path.GetExtension(fileToAnalyze)}";
-
-                            using (var archive = ZipFile.Open(destZipPath, ZipArchiveMode.Create))
+                            foreach (var extractedFile in Directory.GetFiles(extractSubDir, "*.*", SearchOption.AllDirectories))
                             {
-                                archive.CreateEntryFromFile(fileToAnalyze, internalFileName);
+                                string crc = CalculateCrc32(extractedFile);
+                                long size = new FileInfo(extractedFile).Length;
+                                var key = (size, crc.ToUpperInvariant());
+                                if (!availableRoms.ContainsKey(key))
+                                {
+                                    availableRoms[key] = extractedFile;
+                                }
+                                string fileName = Path.GetFileName(extractedFile);
+                                if (!availableFilesByName.ContainsKey(fileName))
+                                {
+                                    availableFilesByName[fileName] = extractedFile;
+                                }
+                                extractedPathToSourceRomMap[extractedFile] = rom.FilePath;
                             }
-                            result.Moved++;
                         }
-                        else if (nameMappings.ContainsKey(Path.GetFileNameWithoutExtension(fileToAnalyze)))
+                        catch (Exception ex)
                         {
-                            Directory.CreateDirectory(badDir);
-                            string destBad = Path.Combine(badDir, fileNameOnly);
-                            File.Copy(rom.FilePath, destBad, true);
-                            result.Moved++;
-                        }
-                        else
-                        {
-                            Directory.CreateDirectory(unknownDir);
-                            string destUnknown = Path.Combine(unknownDir, fileNameOnly);
-                            File.Copy(rom.FilePath, destUnknown, true);
-                            result.Moved++;
+                            Debug.WriteLine($"Failed to extract archive {rom.FilePath}: {ex.Message}");
                         }
                     }
-                    catch
+                    else
                     {
-                        result.Failed++;
+                        string crc = CalculateCrc32(fileToAnalyze);
+                        long size = new FileInfo(fileToAnalyze).Length;
+                        var key = (size, crc.ToUpperInvariant());
+                        if (!availableRoms.ContainsKey(key))
+                        {
+                            availableRoms[key] = fileToAnalyze;
+                        }
+                        string fileName = Path.GetFileName(fileToAnalyze);
+                        if (!availableFilesByName.ContainsKey(fileName))
+                        {
+                          availableFilesByName[fileName] = fileToAnalyze;
+                        }
+                        extractedPathToSourceRomMap[fileToAnalyze] = rom.FilePath;
                     }
+                }
 
+                int index = 0;
+                foreach (var game in consoleGames)
+                {
+                    index++;
                     progress?.Report(new RebuildProgressReport
                     {
-                        Current = result.Processed,
-                        Total = scannedRoms.Count,
-                        CurrentMessage = Path.GetFileName(rom.FilePath)
+                        Current = index,
+                        Total = consoleGames.Count,
+                        CurrentMessage = $"Rebuilding: {game.Description}"
                     });
 
-                    // Give UI thread a chance to refresh
-                    await Task.Delay(1);
+                    var matchedFiles = new Dictionary<RomDatInfo, string>();
+                    foreach (var reqRom in game.RequiredRoms)
+                    {
+                        var key = (reqRom.Size, reqRom.Crc);
+                        if (availableRoms.TryGetValue(key, out var filePath))
+                        {
+                            matchedFiles[reqRom] = filePath;
+                            if (extractedPathToSourceRomMap.TryGetValue(filePath, out var sourcePath))
+                            {
+                                matchedSourcePaths.Add(sourcePath);
+                            }
+                        }
+                        else if (reqRom.Name.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) && availableFilesByName.TryGetValue(reqRom.Name, out var namePath))
+                        {
+                            matchedFiles[reqRom] = namePath;
+                            if (extractedPathToSourceRomMap.TryGetValue(namePath, out var sourcePath))
+                            {
+                                matchedSourcePaths.Add(sourcePath);
+                            }
+                        }
+                    }
+
+                    if (matchedFiles.Count > 0)
+                    {
+                        try
+                        {
+                            string targetName = SanitizeFileName(game.Description);
+                            string destinationFolder = targetOutputDir;
+                            if (sortIntoRegionFolders)
+                            {
+                                string regionTag = SanitizeFileName(ExtractRegion(game.Description, regionPriorities));
+                                destinationFolder = Path.Combine(targetOutputDir, regionTag);
+                                Directory.CreateDirectory(destinationFolder);
+                            }
+
+                            if (format == OutputFormat.Zip)
+                            {
+                                string destZipPath = Path.Combine(destinationFolder, $"{targetName}.zip");
+                                using (var archive = ZipFile.Open(destZipPath, ZipArchiveMode.Create))
+                                {
+                                    foreach (var pair in matchedFiles)
+                                    {
+                                        archive.CreateEntryFromFile(pair.Value, pair.Key.Name);
+                                    }
+                                }
+                            }
+                            else if (format == OutputFormat.SevenZ)
+                            {
+                                string dest7zPath = Path.Combine(destinationFolder, $"{targetName}.7z");
+                                if (File.Exists(dest7zPath)) File.Delete(dest7zPath);
+
+                                string gameFolder = Path.Combine(destinationFolder, targetName + "_temp");
+                                Directory.CreateDirectory(gameFolder);
+                                try
+                                {
+                                    foreach (var pair in matchedFiles)
+                                    {
+                                        string destFilePath = Path.Combine(gameFolder, pair.Key.Name);
+                                        string? parentDir = Path.GetDirectoryName(destFilePath);
+                                        if (!string.IsNullOrEmpty(parentDir)) Directory.CreateDirectory(parentDir);
+                                        File.Copy(pair.Value, destFilePath, true);
+                                    }
+
+                                    bool compressed = false;
+                                    string[] exeNames = { "7z", "7za", @"C:\Program Files\7-Zip\7z.exe", @"C:\Program Files (x86)\7-Zip\7z.exe" };
+                                    foreach (var exe in exeNames)
+                                    {
+                                        try
+                                        {
+                                            var psi = new ProcessStartInfo
+                                            {
+                                                FileName = exe,
+                                                Arguments = $"a -t7z \"{dest7zPath}\" * -y",
+                                                WorkingDirectory = gameFolder,
+                                                RedirectStandardOutput = true,
+                                                RedirectStandardError = true,
+                                                UseShellExecute = false,
+                                                CreateNoWindow = true
+                                            };
+                                            using var proc = Process.Start(psi);
+                                            if (proc != null)
+                                            {
+                                                proc.WaitForExit();
+                                                if (proc.ExitCode == 0 && File.Exists(dest7zPath) && new FileInfo(dest7zPath).Length > 0)
+                                                {
+                                                    compressed = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        catch { }
+                                    }
+
+                                    if (!compressed)
+                                    {
+                                        if (File.Exists(dest7zPath)) File.Delete(dest7zPath);
+                                        string finalFolder = Path.Combine(destinationFolder, targetName);
+                                        if (Directory.Exists(finalFolder)) Directory.Delete(finalFolder, true);
+                                        Directory.Move(gameFolder, finalFolder);
+                                    }
+                                }
+                                finally
+                                {
+                                    if (Directory.Exists(gameFolder))
+                                    {
+                                        try { Directory.Delete(gameFolder, true); } catch { }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                string gameFolder = Path.Combine(destinationFolder, targetName);
+                                Directory.CreateDirectory(gameFolder);
+                                foreach (var pair in matchedFiles)
+                                {
+                                    File.Copy(pair.Value, Path.Combine(gameFolder, pair.Key.Name), true);
+                                }
+                            }
+
+                            result.Moved++;
+                            result.Processed += matchedFiles.Count;
+                        }
+                        catch
+                        {
+                            result.Failed++;
+                        }
+                    }
+
+                    await Task.Delay(2);
+                }
+
+                foreach (var scannedRom in scannedRoms)
+                {
+                    if (!matchedSourcePaths.Contains(scannedRom.FilePath))
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(unknownOutputDir);
+                            string destUnknownPath = Path.Combine(unknownOutputDir, Path.GetFileName(scannedRom.FilePath));
+                            if (!File.Exists(destUnknownPath))
+                            {
+                                File.Copy(scannedRom.FilePath, destUnknownPath, true);
+                                result.UnknownFilesHandled++;
+                            }
+                        }
+                        catch { }
+                    }
                 }
             }
             finally
@@ -705,12 +673,36 @@ namespace RomRebuilderUI.Services
                 {
                     try { Directory.Delete(tempRoot, true); } catch { }
                 }
+
+                stopwatch.Stop();
+                result.ElapsedTime = stopwatch.Elapsed;
             }
 
             return result;
         }
 
-        private string CleanRomName(string name) => string.IsNullOrWhiteSpace(name) ? "unknown" : name.Trim();
+        private string ExtractRegion(string description, string regionPriorities)
+        {
+            var priorities = regionPriorities.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                                             .Select(r => r.Trim())
+                                             .ToList();
+
+            foreach (var priority in priorities)
+            {
+                if (description.Contains(priority, StringComparison.OrdinalIgnoreCase))
+                {
+                    return priority;
+                }
+            }
+
+            var match = System.Text.RegularExpressions.Regex.Match(description, @"\(([^)]+)\)");
+            if (match.Success)
+            {
+                return match.Groups[1].Value.Split(',')[0].Trim();
+            }
+
+            return "Other";
+        }
 
         private string SanitizeFileName(string name)
         {

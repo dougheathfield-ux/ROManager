@@ -1,17 +1,31 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RomRebuilderUI.ViewModels"
+             xmlns:v="using:RomRebuilderUI.Views"
              x:Class="RomRebuilderUI.App"
-             xmlns:local="using:RomRebuilderUI"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
 
+    <!-- Explicitly map ViewModels to their corresponding Views -->
     <Application.DataTemplates>
-        <local:ViewLocator />
+        <DataTemplate DataType="{x:Type vm:MameWorkflowViewModel}">
+            <v:MameWorkflowView/>
+        </DataTemplate>
+        
+        <DataTemplate DataType="{x:Type vm:ConsoleWorkflowViewModel}">
+            <v:ConsoleWorkflowView/>
+        </DataTemplate>
+        
+        <DataTemplate DataType="{x:Type vm:InspectorViewModel}">
+            <v:InspectorView/>
+        </DataTemplate>
+        
+        <DataTemplate DataType="{x:Type vm:MonitorViewModel}">
+            <v:MonitorView/>
+        </DataTemplate>
     </Application.DataTemplates>
 
     <Application.Styles>
-        <FluentTheme />
-        <!-- Required for DataGrid styling and binding propagation -->
-        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <FluentTheme/>
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
     </Application.Styles>
 </Application>

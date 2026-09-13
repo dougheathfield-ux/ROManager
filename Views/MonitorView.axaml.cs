@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace RomRebuilderUI.Views
 {
-    public partial class MainWindow : Window
+    public partial class MonitorView : UserControl
     {
-        public MainWindow()
+        public MonitorView()
         {
             InitializeComponent();
         }

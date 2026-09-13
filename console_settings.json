@@ -1,0 +1,11 @@
+{
+  "DatPath": "/home/doug/Downloads/Games_Project/C.NET/DATs/Nintendo - Nintendo 64 (BigEndian) (20260829-161136).dat",
+  "SourceDirs": [
+    "/home/doug/Downloads/Console_Roms/N64/"
+  ],
+  "OutputDir": "/home/doug/Downloads/Console_Roms_Sorted/",
+  "Is1G1REnabled": false,
+  "IsRegionSortingEnabled": false,
+  "RegionPriorities": "USA, World, Europe, Japan, Other",
+  "CompressionFormat": ".zip"
+}

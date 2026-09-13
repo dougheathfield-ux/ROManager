@@ -1,0 +1,114 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:RomRebuilderUI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="RomRebuilderUI.Views.MameWorkflowView"
+             x:DataType="vm:MameWorkflowViewModel">
+
+    <Grid RowDefinitions="*, Auto" Margin="16">
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="16">
+                <!-- Header -->
+                <TextBlock Text="MAME Arcade Rebuilder &amp; Auditor" FontSize="20" FontWeight="Bold"/>
+                <Separator/>
+
+                <!-- Configuration Section -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Configuration" FontWeight="SemiBold" FontSize="14"/>
+                    
+                    <!-- DAT Path -->
+                    <Grid ColumnDefinitions="140, *" ColumnSpacing="8">
+                        <TextBlock Text="MAME XML/DAT:" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding MameDatPath}"/>
+                    </Grid>
+
+                    <!-- Output Path -->
+                    <Grid ColumnDefinitions="140, *" ColumnSpacing="8">
+                        <TextBlock Text="Output Directory:" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding MameOutputDir}"/>
+                    </Grid>
+
+                    <!-- Rebuild Mode & Format Dropdowns -->
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="16">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Rebuild Mode:"/>
+                            <ComboBox ItemsSource="{Binding RebuildModes}" 
+                                      SelectedItem="{Binding SelectedRebuildMode}" 
+                                      HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Output Format:"/>
+                            <ComboBox ItemsSource="{Binding OutputFormats}" 
+                                      SelectedItem="{Binding MameOutputFormat}" 
+                                      HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Source Directories Section -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Source Directories" FontWeight="SemiBold" FontSize="14"/>
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <ListBox Height="90" ItemsSource="{Binding MameSourceDirs}" SelectedItem="{Binding SelectedMameSourceDir}"/>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Top">
+                            <Button Content="Remove" Command="{Binding RemoveMameSourceCommand}" CommandParameter="{Binding SelectedMameSourceDir}" Width="90"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Operations & Real-Time Statistics -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Operations &amp; Telemetry" FontWeight="SemiBold" FontSize="14"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="Run Audit" Command="{Binding AuditMameCommand}" IsEnabled="{Binding !IsWorking}" Width="120"/>
+                        <Button Content="Run Rebuild" Command="{Binding RebuildMameCommand}" IsEnabled="{Binding !IsWorking}" Width="120"/>
+                    </StackPanel>
+
+                    <!-- Statistics Dashboard Cards -->
+                    <UniformGrid Columns="5" Margin="0, 8, 0, 0">
+                        <Border BorderBrush="#33808080" BorderThickness="1" Padding="8" CornerRadius="4" Margin="2">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Scanned" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding TotalScanned}" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border BorderBrush="#33808080" BorderThickness="1" Padding="8" CornerRadius="4" Margin="2">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Matched" FontSize="11" Foreground="LightGreen" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding MatchedCount}" FontSize="16" FontWeight="Bold" Foreground="LightGreen" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border BorderBrush="#33808080" BorderThickness="1" Padding="8" CornerRadius="4" Margin="2">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Unknown" FontSize="11" Foreground="Orange" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding UnknownCount}" FontSize="16" FontWeight="Bold" Foreground="Orange" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border BorderBrush="#33808080" BorderThickness="1" Padding="8" CornerRadius="4" Margin="2">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Bad/Broken" FontSize="11" Foreground="IndianRed" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding BadOrNotNeededCount}" FontSize="16" FontWeight="Bold" Foreground="IndianRed" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border BorderBrush="#33808080" BorderThickness="1" Padding="8" CornerRadius="4" Margin="2">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Missing" FontSize="11" Foreground="Red" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding MissingCount}" FontSize="16" FontWeight="Bold" Foreground="Red" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Bottom Progress Bar & Status Text -->
+        <Border Grid.Row="1" Padding="0, 10, 0, 0">
+            <StackPanel Spacing="4">
+                <ProgressBar Value="{Binding ProgressValue}" Maximum="{Binding ProgressMaximum}" Height="6"/>
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="Gray"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
