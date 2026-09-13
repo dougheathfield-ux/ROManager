@@ -39,14 +39,7 @@ namespace RomRebuilderUI.ViewModels
         [ObservableProperty] private int _progressValue;
         [ObservableProperty] private int _progressMaximum = 100;
         [ObservableProperty] private string _statusMessage = "Ready";
-<<<<<<< HEAD
         [ObservableProperty] private string _rebuildElapsedTime = "00:00"; // Added for Step 3
-=======
-<<<<<<< HEAD
-        [ObservableProperty] private string _rebuildElapsedTime = "00:00"; // Added for Step 3
-=======
->>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
->>>>>>> ce1718f54edc81cfff62e2342fbad5847bd38b0c
 
         // --- Real-time Statistics ---
         [ObservableProperty] private int _totalScanned;
@@ -257,7 +250,6 @@ namespace RomRebuilderUI.ViewModels
                 {
                     var combinedItems = new List<MachineAuditItem>(auditItems);
 
-                    // Add unknown files as audit items for the main grid
                     if (summary?.UnknownFiles != null)
                     {
                         foreach (var unknownPath in summary.UnknownFiles)
@@ -328,25 +320,11 @@ namespace RomRebuilderUI.ViewModels
 
             try
             {
-<<<<<<< HEAD
                 RebuildResult? result = null;
 
                 await Task.Run(async () =>
                 {
                     result = await _rebuilderService.RunConsoleRebuild(
-=======
-<<<<<<< HEAD
-                RebuildResult? result = null;
-
-                await Task.Run(async () =>
-                {
-                    result = await _rebuilderService.RunConsoleRebuild(
-=======
-                await Task.Run(async () =>
-                {
-                    await _rebuilderService.RunConsoleRebuild(
->>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
->>>>>>> ce1718f54edc81cfff62e2342fbad5847bd38b0c
                         ConsoleSourceDirs, 
                         ConsoleOutputDir, 
                         ConsoleDatPath, 
@@ -358,22 +336,12 @@ namespace RomRebuilderUI.ViewModels
                     );
                 });
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> ce1718f54edc81cfff62e2342fbad5847bd38b0c
                 if (result != null)
                 {
                     RebuildElapsedTime = result.ElapsedTime.ToString(result.ElapsedTime.Hours > 0 ? "hh\\:mm\\:ss" : "mm\\:ss");
                 }
 
                 StatusMessage = $"Console Rebuild Completed Successfully in {RebuildElapsedTime}.";
-<<<<<<< HEAD
-=======
-=======
-                StatusMessage = "Console Rebuild Completed Successfully.";
->>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
->>>>>>> ce1718f54edc81cfff62e2342fbad5847bd38b0c
             }
             catch (Exception ex)
             {
