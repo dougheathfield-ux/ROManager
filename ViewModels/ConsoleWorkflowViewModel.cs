@@ -39,7 +39,10 @@ namespace RomRebuilderUI.ViewModels
         [ObservableProperty] private int _progressValue;
         [ObservableProperty] private int _progressMaximum = 100;
         [ObservableProperty] private string _statusMessage = "Ready";
+<<<<<<< HEAD
         [ObservableProperty] private string _rebuildElapsedTime = "00:00"; // Added for Step 3
+=======
+>>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
 
         // --- Real-time Statistics ---
         [ObservableProperty] private int _totalScanned;
@@ -321,11 +324,17 @@ namespace RomRebuilderUI.ViewModels
 
             try
             {
+<<<<<<< HEAD
                 RebuildResult? result = null;
 
                 await Task.Run(async () =>
                 {
                     result = await _rebuilderService.RunConsoleRebuild(
+=======
+                await Task.Run(async () =>
+                {
+                    await _rebuilderService.RunConsoleRebuild(
+>>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
                         ConsoleSourceDirs, 
                         ConsoleOutputDir, 
                         ConsoleDatPath, 
@@ -337,12 +346,16 @@ namespace RomRebuilderUI.ViewModels
                     );
                 });
 
+<<<<<<< HEAD
                 if (result != null)
                 {
                     RebuildElapsedTime = result.ElapsedTime.ToString(result.ElapsedTime.Hours > 0 ? "hh\\:mm\\:ss" : "mm\\:ss");
                 }
 
                 StatusMessage = $"Console Rebuild Completed Successfully in {RebuildElapsedTime}.";
+=======
+                StatusMessage = "Console Rebuild Completed Successfully.";
+>>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
             }
             catch (Exception ex)
             {

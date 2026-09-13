@@ -25,7 +25,10 @@ namespace RomRebuilderUI.Services
         public int Moved { get; set; }
         public int Failed { get; set; }
         public int UnknownFilesHandled { get; set; }
+<<<<<<< HEAD
         public TimeSpan ElapsedTime { get; set; }
+=======
+>>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
     }
 
     public class RomRebuilderService
@@ -422,8 +425,11 @@ namespace RomRebuilderUI.Services
             if (consoleGames.Count == 0)
             {
                 progress?.Report(new RebuildProgressReport { CurrentMessage = "Error: No games found in DAT definitions." });
+<<<<<<< HEAD
                 stopwatch.Stop();
                 result.ElapsedTime = stopwatch.Elapsed;
+=======
+>>>>>>> 138a04b0330dce3d0e86e9d5e3aefda4f24bc5a2
                 return result;
             }
 
