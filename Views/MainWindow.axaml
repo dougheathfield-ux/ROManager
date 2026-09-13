@@ -14,11 +14,20 @@
     </Design.DataContext>
 
     <Grid ColumnDefinitions="230, *">
-        <!-- Sidebar Navigation Menu -->
+        <!-- Sidebar Navigation Menu[cite: 7] -->
         <Border Grid.Column="0" Background="#252526" Padding="12">
             <StackPanel Spacing="10">
                 <TextBlock Text="ROManager" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,10" HorizontalAlignment="Center"/>
                 
+                <!-- New MAME Scanner Navigation Option -->
+                <Button Content="MAME Scanner" 
+                        Command="{Binding NavigateCommand}" 
+                        CommandParameter="MameScanner" 
+                        Foreground="White"
+                        Background="#333337"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"/>
+
                 <Button Content="MAME Arcade" 
                         Command="{Binding NavigateCommand}" 
                         CommandParameter="Mame" 
@@ -53,7 +62,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Active Workflow View Container -->
+        <!-- Active Workflow View Container[cite: 7] -->
         <ContentControl Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="0"/>
     </Grid>
 </Window>

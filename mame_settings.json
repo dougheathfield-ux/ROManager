@@ -1,0 +1,12 @@
+{
+  "DatPath": "/home/doug/Downloads/Games_Project/C.NET/DATs/MAME 0.264.dat",
+  "SourceDirs": [
+    "/home/doug/Downloads/MAME_Games/"
+  ],
+  "OutputDir": "/home/doug/Downloads/MAME_Games_Sorted/",
+  "RebuildMode": 2,
+  "CompressionFormat": ".zip",
+  "AuditDisks": true,
+  "AuditSamples": false,
+  "MoveUnneededFiles": true
+}

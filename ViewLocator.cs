@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using RomRebuilderUI.ViewModels;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace RomRebuilderUI;
 
@@ -19,7 +19,11 @@ public class ViewLocator : IDataTemplate
         if (param is null)
             return null;
         
-        var name = param.GetType().FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
+        // Fix: Replace "ViewModels" with "Views" and "ViewModel" with "View"
+        var name = param.GetType().FullName!
+            .Replace("ViewModels", "Views", StringComparison.Ordinal)
+            .Replace("ViewModel", "View", StringComparison.Ordinal);
+            
         var type = Type.GetType(name);
 
         if (type != null)
@@ -32,6 +36,7 @@ public class ViewLocator : IDataTemplate
 
     public bool Match(object? data)
     {
-        return data is ViewModelBase;
+        // Fix: Allow ObservableObject so Community Toolkit view models match properly
+        return data is ObservableObject;
     }
 }
