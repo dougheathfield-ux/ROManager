@@ -3,6 +3,7 @@
   "SourceDirs": [
     "/home/doug/Downloads/MAME_Games/"
   ],
+  "OutputDir": "/home/doug/Downloads/MAME_Games_Sorted/",
   "RebuildMode": 2,
   "AuditRoms": true,
   "AuditDisks": false,

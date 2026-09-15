@@ -56,5 +56,25 @@ namespace RomRebuilderUI.Views
                 }
             }
         }
+
+        private async void OnBrowseOutputDirClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is MameScannerViewModel vm)
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
+
+                var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Select Output Directory for Reports",
+                    AllowMultiple = false
+                });
+
+                if (folders != null && folders.Count > 0)
+                {
+                    vm.SetOutputDir(folders[0].Path.LocalPath);
+                }
+            }
+        }
     }
 }

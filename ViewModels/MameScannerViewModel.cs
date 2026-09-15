@@ -22,6 +22,7 @@ namespace RomRebuilderUI.ViewModels
         [ObservableProperty] private string _mameDatPath = string.Empty;
         [ObservableProperty] private ObservableCollection<string> _mameSourceDirs = new();
         [ObservableProperty] private string? _selectedMameSourceDir;
+        [ObservableProperty] private string _mameOutputDir = string.Empty;
 
         // --- Structure Context ---
         [ObservableProperty] private RebuildMode _selectedRebuildMode = RebuildMode.Split;
@@ -41,18 +42,16 @@ namespace RomRebuilderUI.ViewModels
         [ObservableProperty] private bool _fixMissingFiles = false;
         [ObservableProperty] private bool _fixUnneededFiles = false;
 
-        // --- Sorting & Filtering ---
-        [ObservableProperty] private string _selectedSortOption = "Machine Name";
+        // --- Filtering & Sorting ---
+        [ObservableProperty] private string _selectedSortOption = "All";
         
-        // Updated Sort options to group/prioritize by status categories
         public List<string> SortOptions { get; } = new() 
         { 
-            "Machine Name", 
-            "Description", 
-            "Complete First", 
-            "Incomplete First", 
-            "Missing First", 
-            "Unknown First" 
+            "All", 
+            "Complete", 
+            "Missing", 
+            "Incomplete", 
+            "Unknown" 
         };
 
         partial void OnSelectedSortOptionChanged(string value)
@@ -73,7 +72,6 @@ namespace RomRebuilderUI.ViewModels
         private List<MachineAuditItem> _unfilteredAuditCache = new();
         [ObservableProperty] private MachineAuditItem? _selectedAuditItem;
 
-        // Safe properties for the details pane to prevent null-binding errors
         [ObservableProperty] private string _selectedMachineNameDisplay = "Missing Files";
         [ObservableProperty] private ObservableCollection<string> _selectedMissingFiles = new();
 
@@ -102,6 +100,12 @@ namespace RomRebuilderUI.ViewModels
             SaveSettings();
         }
 
+        public void SetOutputDir(string path)
+        {
+            MameOutputDir = path;
+            SaveSettings();
+        }
+
         private void SaveSettings()
         {
             try
@@ -110,6 +114,7 @@ namespace RomRebuilderUI.ViewModels
                 {
                     DatPath = MameDatPath,
                     SourceDirs = MameSourceDirs.ToList(),
+                    OutputDir = MameOutputDir,
                     RebuildMode = SelectedRebuildMode,
                     AuditRoms = AuditRoms,
                     AuditDisks = AuditDisks,
@@ -136,6 +141,7 @@ namespace RomRebuilderUI.ViewModels
                     {
                         MameDatPath = settings.DatPath ?? string.Empty;
                         if (settings.SourceDirs != null) MameSourceDirs = new ObservableCollection<string>(settings.SourceDirs);
+                        MameOutputDir = settings.OutputDir ?? string.Empty;
                         SelectedRebuildMode = settings.RebuildMode;
                         AuditRoms = settings.AuditRoms;
                         AuditDisks = settings.AuditDisks;
@@ -191,17 +197,66 @@ namespace RomRebuilderUI.ViewModels
         {
             if (_unfilteredAuditCache.Count == 0) return;
 
-            var sorted = SelectedSortOption switch
+            var filtered = SelectedSortOption switch
             {
-                "Description" => _unfilteredAuditCache.OrderBy(x => x.Description).ThenBy(x => x.Name),
-                "Complete First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
-                "Incomplete First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Incomplete", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
-                "Missing First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Missing", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
-                "Unknown First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
-                _ => _unfilteredAuditCache.OrderBy(x => x.Name).AsEnumerable()
+                "Complete" => _unfilteredAuditCache.Where(x => x.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)),
+                "Incomplete" => _unfilteredAuditCache.Where(x => x.Status.Equals("Incomplete", StringComparison.OrdinalIgnoreCase)),
+                "Missing" => _unfilteredAuditCache.Where(x => x.Status.Equals("Missing", StringComparison.OrdinalIgnoreCase)),
+                "Unknown" => _unfilteredAuditCache.Where(x => x.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase)),
+                _ => _unfilteredAuditCache.AsEnumerable() // "All"
             };
 
-            MameAuditItems = new ObservableCollection<MachineAuditItem>(sorted);
+            MameAuditItems = new ObservableCollection<MachineAuditItem>(filtered.OrderBy(x => x.Name));
+        }
+
+        [RelayCommand]
+        private void ExportMissingList()
+        {
+            try
+            {
+                string targetDir = MameOutputDir;
+                if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))
+                {
+                    targetDir = MameSourceDirs.FirstOrDefault(Directory.Exists) ?? Directory.GetCurrentDirectory();
+                }
+
+                string filePath = Path.Combine(targetDir, "mame_missing_files_report.txt");
+                
+                var lines = new List<string>
+                {
+                    $"MAME Missing Files Report - Generated: {DateTime.Now}",
+                    new string('=', 60),
+                    string.Empty
+                };
+
+                var incompleteOrMissing = _unfilteredAuditCache
+                    .Where(x => x.MissingFiles != null && x.MissingFiles.Count > 0)
+                    .ToList();
+
+                if (incompleteOrMissing.Count == 0)
+                {
+                    StatusMessage = "No missing files to export!";
+                    return;
+                }
+
+                foreach (var item in incompleteOrMissing)
+                {
+                    lines.Add($"Machine: {item.Name} ({item.Description}) - Status: {item.Status} [{item.RomCountSummary}]");
+                    lines.Add("Missing Files:");
+                    foreach (var file in item.MissingFiles)
+                    {
+                        lines.Add($"  - {file}");
+                    }
+                    lines.Add(string.Empty);
+                }
+
+                File.WriteAllLines(filePath, lines);
+                StatusMessage = $"Missing list exported to: {filePath}";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Export Error: {ex.Message}";
+            }
         }
 
         [RelayCommand]
@@ -269,6 +324,7 @@ namespace RomRebuilderUI.ViewModels
     {
         public string DatPath { get; set; } = string.Empty;
         public List<string> SourceDirs { get; set; } = new();
+        public string OutputDir { get; set; } = string.Empty;
         public RebuildMode RebuildMode { get; set; }
         public bool AuditRoms { get; set; }
         public bool AuditDisks { get; set; }
