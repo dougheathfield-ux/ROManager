@@ -5,261 +5,136 @@
              xmlns:vm="using:RomRebuilderUI.ViewModels"
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
              x:Class="RomRebuilderUI.Views.MameWorkflowView"
-             x:DataType="vm:MameWorkflowViewModel">
+             x:DataType="vm:MameWorkflowViewModel"
+             Background="#1E1E1E">
 
-    <!-- Root Grid to allow overlaying the "Please Wait" popup -->
     <Grid>
-        <!-- Vertical Split Layout: Left panel for controls, Right panel for Dashboard -->
-        <Grid ColumnDefinitions="460, 12, *" Margin="16">
-            
-            <!-- LEFT COLUMN: Workflow Controls & Configuration -->
-            <Grid Grid.Column="0" RowDefinitions="*, Auto">
-                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="14" Margin="0,0,4,0">
-                        <!-- Header -->
-                        <TextBlock Text="MAME Arcade Rebuilder &amp; Auditor" FontSize="18" FontWeight="Bold"/>
-                        <Separator/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="16">
+            <StackPanel Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
+                
+                <!-- Header -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="MAME Arcade Rebuilder" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Engine-level sorting, restructuring, and compression engine inspired by ClrMamePro." FontSize="12" Foreground="DarkGray"/>
+                </StackPanel>
+                <Separator/>
 
-                        <!-- 1. DAT File Selection -->
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="1. MAME DAT / XML File" FontWeight="SemiBold" FontSize="13"/>
-                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
-                                <TextBox Grid.Column="0" Text="{Binding MameDatPath}" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="Browse..." Width="80" Click="OnBrowseDatClick"/>
-                            </Grid>
-                        </StackPanel>
-
-                        <!-- 2. Source Directories -->
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="2. Source ROM Directories" FontWeight="SemiBold" FontSize="13"/>
-                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
-                                <ListBox Grid.Column="0" Height="85" ItemsSource="{Binding MameSourceDirs}" SelectedItem="{Binding SelectedMameSourceDir}"/>
-                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Top">
-                                    <Button Content="Add..." Width="90" Click="OnAddSourceClick"/>
-                                    <Button Content="Remove" Command="{Binding RemoveSourceCommand}" CommandParameter="{Binding SelectedMameSourceDir}" Width="90"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-
-                        <!-- 3. Output Directory Selection -->
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="3. Output Directory" FontWeight="SemiBold" FontSize="13"/>
-                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
-                                <TextBox Grid.Column="0" Text="{Binding MameOutputDir}" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="Browse..." Width="80" Click="OnBrowseOutputClick"/>
-                            </Grid>
-                        </StackPanel>
-
-                        <Separator Margin="0,4,0,4"/>
-
-                        <!-- SCANNER & AUDITOR OPTIONS (ClrMamePro Style) -->
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Scanner &amp; Auditor Options" FontWeight="SemiBold" FontSize="13"/>
-                            
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,2" Spacing="8">
-                                <TextBlock Text="Structure Context:" VerticalAlignment="Center" FontSize="12"/>
-                                <ComboBox Width="130" FontSize="11" 
-                                          ItemsSource="{Binding RebuildModeOptions}" 
-                                          SelectedItem="{Binding SelectedRebuildMode}"/>
-                            </StackPanel>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,4" Spacing="8">
-                                <TextBlock Text="Compression:" VerticalAlignment="Center" FontSize="12"/>
-                                <ComboBox Width="130" FontSize="11" 
-                                          ItemsSource="{Binding CompressionFormatOptions}" 
-                                          SelectedItem="{Binding CompressionFormat}"/>
-                            </StackPanel>
-
-                            <!-- Target Selection -->
-                            <TextBlock Text="Target Selection:" FontSize="11" Foreground="DarkGray" Margin="0,4,0,0"/>
-                            <UniformGrid Columns="2" Margin="12,0,0,2">
-                                <CheckBox Content="ROMs" IsChecked="{Binding AuditRoms}" FontSize="11"/>
-                                <CheckBox Content="Disks (CHD)" IsChecked="{Binding AuditDisks}" FontSize="11"/>
-                                <CheckBox Content="Samples" IsChecked="{Binding AuditSamples}" FontSize="11"/>
-                                <CheckBox Content="BIOS / Extras" IsChecked="{Binding AuditBios}" FontSize="11"/>
-                            </UniformGrid>
-
-                            <!-- Deep Verification Flags -->
-                            <TextBlock Text="Deep Verification Flags:" FontSize="11" Foreground="DarkGray" Margin="0,4,0,0"/>
-                            <CheckBox Content="Decompress &amp; check internal checksums" IsChecked="{Binding DecompressAndVerify}" FontSize="11" Margin="12,0,0,0"/>
-                            <CheckBox Content="Deep CHD block integrity check (MD5/SHA1)" IsChecked="{Binding ChdDeepVerify}" FontSize="11" Margin="12,0,0,0"/>
-
-                            <!-- Fix & Cleanup Options -->
-                            <TextBlock Text="Fix &amp; Cleanup Actions:" FontSize="11" Foreground="DarkGray" Margin="0,4,0,0"/>
-                            <CheckBox Content="Fix Missing (Pull from Add-Paths)" IsChecked="{Binding FixMissingFiles}" FontSize="11" Margin="12,0,0,0"/>
-                            <CheckBox Content="Fix Unneeded / Bad (Move to backup)" IsChecked="{Binding FixUnneededFiles}" FontSize="11" Margin="12,0,0,0"/>
-                            
-                            <!-- Additional Rebuilder Flags -->
-                            <TextBlock Text="Rebuilder Rules:" FontSize="11" Foreground="DarkGray" Margin="0,4,0,0"/>
-                            <CheckBox Content="Separate BIOS sets into dedicated archives" IsChecked="{Binding SeparateBiosSets}" FontSize="11" Margin="12,0,0,0"/>
-                            <CheckBox Content="Remove successfully matched source files" IsChecked="{Binding RemoveMatchedSourceFiles}" FontSize="11" Margin="12,0,0,0"/>
-                        </StackPanel>
-
-                        <Separator Margin="0,4,0,4"/>
-
-                        <!-- Operations & Real-Time Statistics -->
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Operations &amp; Telemetry" FontWeight="SemiBold" FontSize="13"/>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Run Audit" Command="{Binding AuditMameCommand}" IsEnabled="{Binding !IsWorking}" Width="95"/>
-                                <Button Content="Run Rebuild" Command="{Binding RebuildMameCommand}" IsEnabled="{Binding !IsWorking}" Width="100"/>
-                                <Button Content="Clear" Command="{Binding ClearScanCommand}" IsEnabled="{Binding !IsWorking}" Width="75"/>
-                            </StackPanel>
-
-                            <!-- Compact Statistics Dashboard Cards -->
-                            <UniformGrid Columns="5" Margin="0, 4, 0, 0">
-                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock Text="Scan" FontSize="10" Foreground="Gray" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="{Binding MameAuditItems.Count}" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock Text="Complete" FontSize="10" Foreground="LightGreen" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="0" FontSize="13" FontWeight="Bold" Foreground="LightGreen" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock Text="Incomplete" FontSize="10" Foreground="Yellow" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="0" FontSize="13" FontWeight="Bold" Foreground="Yellow" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock Text="Missing" FontSize="10" Foreground="Red" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="0" FontSize="13" FontWeight="Bold" Foreground="Red" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border BorderBrush="#33808080" BorderThickness="1" Padding="4" CornerRadius="4" Margin="1">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock Text="Unknown" FontSize="10" Foreground="MediumPurple" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="0" FontSize="13" FontWeight="Bold" Foreground="MediumPurple" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                            </UniformGrid>
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- Bottom Progress Bar & Status Text -->
-                <Border Grid.Row="1" Padding="0, 8, 0, 0">
-                    <StackPanel Spacing="4">
-                        <ProgressBar Value="{Binding ProgressValue}" 
-                                     Maximum="{Binding ProgressMaximum}" 
-                                     IsIndeterminate="{Binding IsIndeterminate}" 
-                                     Height="5"/>
-                        <Grid>
-                            <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="Gray" HorizontalAlignment="Left"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- DIVIDER SEPARATOR -->
-            <Rectangle Grid.Column="1" Fill="#33808080" Width="1" VerticalAlignment="Stretch"/>
-
-            <!-- RIGHT COLUMN: Collection Dashboard & Audit Results -->
-            <Border Grid.Column="2" BorderBrush="#33808080" BorderThickness="1" CornerRadius="6" Background="#161616" Padding="12">
-                <Grid RowDefinitions="Auto, Auto, *, 120, Auto">
+                <!-- 1. PATHS CONFIGURATION -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="1. Paths &amp; Directories" FontWeight="SemiBold" FontSize="14" Foreground="LightBlue"/>
                     
-                    <!-- 1. TOP SECTION: Health Overview -->
-                    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
-                        <Grid>
-                            <TextBlock Text="Collection Health Dashboard" FontSize="15" FontWeight="Bold" HorizontalAlignment="Left"/>
-                            <TextBlock Text="0.0% Complete" FontSize="14" FontWeight="SemiBold" Foreground="LightGreen" HorizontalAlignment="Right"/>
+                    <!-- DAT File -->
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="MAME DAT / XML File" FontSize="12"/>
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                            <TextBox Grid.Column="0" Text="{Binding MameDatPath}" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Content="Browse..." Width="90" Click="OnBrowseDatClick"/>
                         </Grid>
-                        <ProgressBar Value="0" Maximum="100" Height="8" Foreground="LightGreen"/>
-                        <UniformGrid Columns="4" Margin="0,4,0,0">
-                            <TextBlock Text="Complete: 0" Foreground="LightGreen" FontSize="11"/>
-                            <TextBlock Text="Incomplete: 0" Foreground="Yellow" FontSize="11"/>
-                            <TextBlock Text="Missing: 0" Foreground="Red" FontSize="11"/>
-                            <TextBlock Text="Unknown: 0" Foreground="MediumPurple" FontSize="11"/>
-                        </UniformGrid>
                     </StackPanel>
 
-                    <Separator Grid.Row="1" Margin="0,0,0,8"/>
-
-                    <!-- 2. MIDDLE SECTION: Sets Explorer with Sort & Filter Controls -->
-                    <Grid Grid.Row="2" RowDefinitions="Auto, *" Margin="0,0,0,8">
-                        <Grid Grid.Row="0" Margin="0,0,0,6">
-                            <TextBlock Text="Sets Explorer" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
-                                <TextBlock Text="Sort:" FontSize="11" Foreground="DarkGray" VerticalAlignment="Center"/>
-                                <ComboBox Width="110" FontSize="11" 
-                                          ItemsSource="{Binding SortOptions}" 
-                                          SelectedItem="{Binding SelectedSortOption}"/>
-                                <TextBlock Text="Filter:" FontSize="11" Foreground="DarkGray" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                                <ComboBox Width="100" FontSize="11" SelectedIndex="0">
-                                    <ComboBoxItem Content="All"/>
-                                    <ComboBoxItem Content="Complete"/>
-                                    <ComboBoxItem Content="Missing"/>
-                                </ComboBox>
+                    <!-- Source Directories -->
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Primary Source ROM Directories" FontSize="12"/>
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                            <ListBox Grid.Column="0" Height="75" ItemsSource="{Binding SourceDirs}" SelectedItem="{Binding SelectedSourceDir}"/>
+                            <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Top">
+                                <Button Content="Add..." Width="90" Click="OnAddSourceClick"/>
+                                <Button Content="Remove" Command="{Binding RemoveSourceCommand}" CommandParameter="{Binding SelectedSourceDir}" Width="90"/>
                             </StackPanel>
                         </Grid>
-
-                        <DataGrid Grid.Row="1" 
-                                  ItemsSource="{Binding MameAuditItems}" 
-                                  SelectedItem="{Binding SelectedAuditItem}"
-                                  AutoGenerateColumns="False" 
-                                  IsReadOnly="True"
-                                  CanUserSortColumns="True" 
-                                  CanUserResizeColumns="True"
-                                  HorizontalScrollBarVisibility="Auto"
-                                  Background="#1E1E1E"
-                                  Foreground="White">
-                            <DataGrid.Styles>
-                                <Style Selector="DataGridCell">
-                                    <Setter Property="Foreground" Value="White"/>
-                                </Style>
-                            </DataGrid.Styles>
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Machine / System Name" Binding="{Binding Name}" Width="*"/>
-                                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="180"/>
-                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Region}" Width="Auto"/>
-                                <DataGridTextColumn Header="Files" Binding="{Binding RomCountSummary}" Width="Auto"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </Grid>
-
-                    <!-- 3. BOTTOM SECTION: Missing Files Drill-Down Inspector -->
-                    <Border Grid.Row="3" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Background="#121212" Padding="8" Margin="0,8,0,0">
-                        <Grid RowDefinitions="Auto, *">
-                            <TextBlock Grid.Row="0" Text="{Binding SelectedAuditItem.Name, StringFormat='Missing Files for: {0}'}" FontWeight="SemiBold" FontSize="11" Foreground="DarkGray" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
-                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedAuditItem.MissingFiles}" Background="Transparent" BorderThickness="0" FontSize="11">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="IndianRed"/>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Grid>
-                    </Border>
-
-                    <!-- 4. ACTIONS: Export Missing List -->
-                    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                        <Button Content="Export Missing List..." Width="160" IsEnabled="{Binding HasAuditItems}"/>
                     </StackPanel>
 
-                </Grid>
-            </Border>
-        </Grid>
+                    <!-- Add-Paths -->
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Auxiliary Add-Paths (Secondary files fallback)" FontSize="12"/>
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                            <ListBox Grid.Column="0" Height="65" ItemsSource="{Binding AddPaths}" SelectedItem="{Binding SelectedAddPath}"/>
+                            <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Top">
+                                <Button Content="Add..." Width="90" Click="OnAddAddPathClick"/>
+                                <Button Content="Remove" Command="{Binding RemoveAddPathCommand}" CommandParameter="{Binding SelectedAddPath}" Width="90"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Output Directory -->
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Output Destination Directory" FontSize="12"/>
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                            <TextBox Grid.Column="0" Text="{Binding OutputDirectory}" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Content="Browse..." Width="90" Click="OnBrowseOutputClick"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+
+                <Separator/>
+
+                <!-- 2. ARCHITECTURE & FORMAT -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="2. Architecture &amp; Output Format" FontWeight="SemiBold" FontSize="14" Foreground="LightBlue"/>
+                    
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="16">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Rebuild Structure Mode:" FontSize="12"/>
+                            <ComboBox HorizontalAlignment="Stretch" 
+                                      ItemsSource="{Binding RebuildModeOptions}" 
+                                      SelectedItem="{Binding SelectedRebuildMode}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Compression Format:" FontSize="12"/>
+                            <ComboBox HorizontalAlignment="Stretch" 
+                                      ItemsSource="{Binding CompressionFormatOptions}" 
+                                      SelectedItem="{Binding SelectedCompressionFormat}"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <Separator/>
+
+                <!-- 3. ADVANCED REBUILDER ENGINE OPTIONS -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="3. Advanced Rebuilder Engine Toggles" FontWeight="SemiBold" FontSize="14" Foreground="LightBlue"/>
+                    
+                    <UniformGrid Columns="2" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="6" Margin="0,0,8,0">
+                            <CheckBox Content="Separate BIOS sets into dedicated archives" IsChecked="{Binding SeparateBiosSets}" FontSize="12"/>
+                            <CheckBox Content="Recompress files (forces fresh compression ratio)" IsChecked="{Binding RecompressFiles}" FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <CheckBox Content="Remove successfully matched source files" IsChecked="{Binding RemoveMatchedSourceFiles}" FontSize="12"/>
+                            <CheckBox Content="Verify deep hashes on match (prevent CRC collisions)" IsChecked="{Binding VerifyHashesOnMatch}" FontSize="12"/>
+                        </StackPanel>
+                    </UniformGrid>
+                </StackPanel>
+
+                <Separator/>
+
+                <!-- 4. EXECUTION & PROGRESS -->
+                <StackPanel Spacing="8">
+                    <Button Content="Run Arcade Rebuild" 
+                            Command="{Binding RunRebuildCommand}" 
+                            IsEnabled="{Binding !IsWorking}" 
+                            HorizontalAlignment="Left" 
+                            Width="180" 
+                            Height="36"/>
+
+                    <ProgressBar Value="{Binding ProgressValue}" 
+                                 Maximum="{Binding ProgressMaximum}" 
+                                 IsIndeterminate="{Binding IsIndeterminate}" 
+                                 Height="6"/>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="DarkGray"/>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
 
         <!-- PLEASE WAIT OVERLAY -->
         <Border Background="#A0000000" IsVisible="{Binding IsWorking}" ZIndex="999">
-            <Border HorizontalAlignment="Center" 
-                    VerticalAlignment="Center" 
-                    Background="#222222" 
-                    Padding="32,24" 
-                    CornerRadius="8" 
-                    BorderBrush="#44808080" 
-                    BorderThickness="1">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center" Background="#222222" Padding="32,24" CornerRadius="8" BorderBrush="#44808080" BorderThickness="1">
                 <StackPanel Spacing="14">
                     <ProgressBar IsIndeterminate="True" Width="240" Height="6" Foreground="DodgerBlue"/>
-                    <TextBlock Text="Please wait, scanning source ROM files..." FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="DarkGray" HorizontalAlignment="Center" MaxWidth="300" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="Processing MAME Arcade Rebuild..." FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="DarkGray" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Border>

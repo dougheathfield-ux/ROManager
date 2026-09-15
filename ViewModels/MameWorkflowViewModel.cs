@@ -16,58 +16,37 @@ namespace RomRebuilderUI.ViewModels
     public partial class MameWorkflowViewModel : ObservableObject
     {
         private readonly RomRebuilderService _rebuilderService = new();
-        private const string SettingsFileName = "mame_settings.json";
+        private const string SettingsFileName = "mame_rebuilder_settings.json";
 
         // --- Paths ---
         [ObservableProperty] private string _mameDatPath = string.Empty;
-        [ObservableProperty] private ObservableCollection<string> _mameSourceDirs = new();
-        [ObservableProperty] private string? _selectedMameSourceDir;
-        [ObservableProperty] private string _mameOutputDir = string.Empty;
+        [ObservableProperty] private ObservableCollection<string> _sourceDirs = new();
+        [ObservableProperty] private string? _selectedSourceDir;
 
-        // --- Rebuild & Format Options ---
+        [ObservableProperty] private ObservableCollection<string> _addPaths = new();
+        [ObservableProperty] private string? _selectedAddPath;
+
+        [ObservableProperty] private string _outputDirectory = string.Empty;
+
+        // --- Architecture & Format ---
         [ObservableProperty] private RebuildMode _selectedRebuildMode = RebuildMode.Split;
         public List<RebuildMode> RebuildModeOptions { get; } = new() { RebuildMode.Split, RebuildMode.Merged, RebuildMode.NonMerged };
 
-        [ObservableProperty] private string _compressionFormat = ".zip";
+        [ObservableProperty] private string _selectedCompressionFormat = ".zip";
         public List<string> CompressionFormatOptions { get; } = new() { ".zip", ".7z", "Folder" };
 
-        // --- Scanner & Auditor Options (ClrMamePro Style) ---
-        [ObservableProperty] private bool _auditRoms = true;
-        [ObservableProperty] private bool _auditDisks = true;
-        [ObservableProperty] private bool _auditSamples = false;
-        [ObservableProperty] private bool _auditBios = true;
-
-        [ObservableProperty] private bool _decompressAndVerify = false;
-        [ObservableProperty] private bool _chdDeepVerify = false;
-
-        [ObservableProperty] private bool _fixMissingFiles = false;
-        [ObservableProperty] private bool _fixUnneededFiles = false;
-
-        // Additional Rebuilder Flags
+        // --- Advanced Rebuilder Engine Toggles ---
         [ObservableProperty] private bool _separateBiosSets = true;
+        [ObservableProperty] private bool _recompressFiles = false;
         [ObservableProperty] private bool _removeMatchedSourceFiles = false;
-
-        // --- Sorting & Filtering ---
-        [ObservableProperty] private string _selectedSortOption = "Machine Name";
-        public List<string> SortOptions { get; } = new() { "Machine Name", "Description", "Status", "Missing Files" };
-
-        partial void OnSelectedSortOptionChanged(string value)
-        {
-            ApplySorting();
-        }
+        [ObservableProperty] private bool _verifyHashesOnMatch = true;
 
         // --- Progress & UI State ---
         [ObservableProperty] private bool _isWorking;
         [ObservableProperty] private bool _isIndeterminate;
         [ObservableProperty] private int _progressValue;
         [ObservableProperty] private int _progressMaximum = 100;
-        [ObservableProperty] private string _statusMessage = "Ready";
-        [ObservableProperty] private bool _hasAuditItems;
-
-        // --- Results ---
-        [ObservableProperty] private ObservableCollection<MachineAuditItem> _mameAuditItems = new();
-        private List<MachineAuditItem> _unfilteredAuditCache = new();
-        [ObservableProperty] private MachineAuditItem? _selectedAuditItem;
+        [ObservableProperty] private string _statusMessage = "Ready to rebuild";
 
         public MameWorkflowViewModel()
         {
@@ -80,9 +59,9 @@ namespace RomRebuilderUI.ViewModels
             SaveSettings();
         }
 
-        public void SetOutputDir(string path)
+        public void SetOutputDirectory(string path)
         {
-            MameOutputDir = path;
+            OutputDirectory = path;
             SaveSettings();
         }
 
@@ -90,23 +69,18 @@ namespace RomRebuilderUI.ViewModels
         {
             try
             {
-                var settings = new MameSettingsDto
+                var settings = new MameRebuilderSettingsDto
                 {
                     DatPath = MameDatPath,
-                    SourceDirs = MameSourceDirs.ToList(),
-                    OutputDir = MameOutputDir,
+                    SourceDirs = SourceDirs.ToList(),
+                    AddPaths = AddPaths.ToList(),
+                    OutputDirectory = OutputDirectory,
                     RebuildMode = SelectedRebuildMode,
-                    CompressionFormat = CompressionFormat,
-                    AuditRoms = AuditRoms,
-                    AuditDisks = AuditDisks,
-                    AuditSamples = AuditSamples,
-                    AuditBios = AuditBios,
-                    DecompressAndVerify = DecompressAndVerify,
-                    ChdDeepVerify = ChdDeepVerify,
-                    FixMissingFiles = FixMissingFiles,
-                    FixUnneededFiles = FixUnneededFiles,
+                    CompressionFormat = SelectedCompressionFormat,
                     SeparateBiosSets = SeparateBiosSets,
-                    RemoveMatchedSourceFiles = RemoveMatchedSourceFiles
+                    RecompressFiles = RecompressFiles,
+                    RemoveMatchedSourceFiles = RemoveMatchedSourceFiles,
+                    VerifyHashesOnMatch = VerifyHashesOnMatch
                 };
                 File.WriteAllText(SettingsFileName, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
             }
@@ -119,24 +93,19 @@ namespace RomRebuilderUI.ViewModels
             {
                 if (File.Exists(SettingsFileName))
                 {
-                    var settings = JsonSerializer.Deserialize<MameSettingsDto>(File.ReadAllText(SettingsFileName));
+                    var settings = JsonSerializer.Deserialize<MameRebuilderSettingsDto>(File.ReadAllText(SettingsFileName));
                     if (settings != null)
                     {
                         MameDatPath = settings.DatPath ?? string.Empty;
-                        MameOutputDir = settings.OutputDir ?? string.Empty;
-                        if (settings.SourceDirs != null) MameSourceDirs = new ObservableCollection<string>(settings.SourceDirs);
+                        if (settings.SourceDirs != null) SourceDirs = new ObservableCollection<string>(settings.SourceDirs);
+                        if (settings.AddPaths != null) AddPaths = new ObservableCollection<string>(settings.AddPaths);
+                        OutputDirectory = settings.OutputDirectory ?? string.Empty;
                         SelectedRebuildMode = settings.RebuildMode;
-                        CompressionFormat = settings.CompressionFormat ?? ".zip";
-                        AuditRoms = settings.AuditRoms;
-                        AuditDisks = settings.AuditDisks;
-                        AuditSamples = settings.AuditSamples;
-                        AuditBios = settings.AuditBios;
-                        DecompressAndVerify = settings.DecompressAndVerify;
-                        ChdDeepVerify = settings.ChdDeepVerify;
-                        FixMissingFiles = settings.FixMissingFiles;
-                        FixUnneededFiles = settings.FixUnneededFiles;
+                        SelectedCompressionFormat = settings.CompressionFormat ?? ".zip";
                         SeparateBiosSets = settings.SeparateBiosSets;
+                        RecompressFiles = settings.RecompressFiles;
                         RemoveMatchedSourceFiles = settings.RemoveMatchedSourceFiles;
+                        VerifyHashesOnMatch = settings.VerifyHashesOnMatch;
                     }
                 }
             }
@@ -146,9 +115,9 @@ namespace RomRebuilderUI.ViewModels
         [RelayCommand]
         public void AddSource(string path)
         {
-            if (!string.IsNullOrWhiteSpace(path) && !MameSourceDirs.Contains(path))
+            if (!string.IsNullOrWhiteSpace(path) && !SourceDirs.Contains(path))
             {
-                MameSourceDirs.Add(path.Trim());
+                SourceDirs.Add(path.Trim());
                 SaveSettings();
             }
         }
@@ -158,50 +127,45 @@ namespace RomRebuilderUI.ViewModels
         {
             if (!string.IsNullOrEmpty(path))
             {
-                MameSourceDirs.Remove(path);
+                SourceDirs.Remove(path);
                 SaveSettings();
             }
         }
 
         [RelayCommand]
-        private void ClearScan()
+        public void AddAddPath(string path)
         {
-            if (IsWorking) return;
-            
-            _unfilteredAuditCache.Clear();
-            MameAuditItems.Clear();
-            SelectedAuditItem = null;
-            HasAuditItems = false;
-            ProgressValue = 0;
-            ProgressMaximum = 100;
-            StatusMessage = "Scan cleared. Ready.";
-        }
-
-        private void ApplySorting()
-        {
-            if (_unfilteredAuditCache.Count == 0) return;
-
-            var sorted = SelectedSortOption switch
+            if (!string.IsNullOrWhiteSpace(path) && !AddPaths.Contains(path))
             {
-                "Description" => _unfilteredAuditCache.OrderBy(x => x.Description).ThenBy(x => x.Name),
-                "Status" => _unfilteredAuditCache.OrderBy(x => x.Status).ThenBy(x => x.Name),
-                "Missing Files" => _unfilteredAuditCache.OrderByDescending(x => x.MissingFiles?.Count ?? 0).ThenBy(x => x.Name),
-                _ => _unfilteredAuditCache.OrderBy(x => x.Name).AsEnumerable()
-            };
-
-            MameAuditItems = new ObservableCollection<MachineAuditItem>(sorted);
+                AddPaths.Add(path.Trim());
+                SaveSettings();
+            }
         }
 
         [RelayCommand]
-        private async Task AuditMameAsync()
+        public void RemoveAddPath(string path)
+        {
+            if (!string.IsNullOrEmpty(path))
+            {
+                AddPaths.Remove(path);
+                SaveSettings();
+            }
+        }
+
+        [RelayCommand]
+        private async Task RunRebuildAsync()
         {
             if (IsWorking) return;
+            if (string.IsNullOrWhiteSpace(MameDatPath) || string.IsNullOrWhiteSpace(OutputDirectory))
+            {
+                StatusMessage = "Error: Please specify a DAT file and an Output Directory.";
+                return;
+            }
+
             IsWorking = true;
             IsIndeterminate = true;
-            StatusMessage = "Auditing MAME sets...";
-            ClearScan();
+            StatusMessage = "Starting MAME arcade rebuild...";
 
-            var auditList = new List<MachineAuditItem>();
             try
             {
                 var progress = new Progress<RebuildProgressReport>(r =>
@@ -214,79 +178,25 @@ namespace RomRebuilderUI.ViewModels
 
                 await Task.Run(async () =>
                 {
-                    await _rebuilderService.RunMameAudit(
-                        MameSourceDirs,
+                    await _rebuilderService.RunMameRebuild(
+                        SourceDirs,
+                        AddPaths,
+                        OutputDirectory,
                         MameDatPath,
                         SelectedRebuildMode,
-                        progress,
-                        item => 
-                        { 
-                            lock (auditList) 
-                            { 
-                                auditList.Add(item); 
-                            } 
-                        }
+                        SelectedCompressionFormat,
+                        SeparateBiosSets,
+                        RecompressFiles,
+                        RemoveMatchedSourceFiles,
+                        VerifyHashesOnMatch,
+                        progress
                     );
                 });
 
                 Dispatcher.UIThread.Post(() =>
                 {
-                    _unfilteredAuditCache = auditList;
-                    ApplySorting();
-                    HasAuditItems = MameAuditItems.Count > 0;
-                    StatusMessage = $"Audit completed. Total machines scanned: {MameAuditItems.Count}";
+                    StatusMessage = "Rebuild completed successfully!";
                 });
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Audit Error: {ex.Message}";
-            }
-            finally
-            {
-                IsWorking = false;
-                IsIndeterminate = false;
-            }
-        }
-
-        [RelayCommand]
-        private async Task RebuildMameAsync()
-        {
-            if (IsWorking) return;
-            IsWorking = true;
-            IsIndeterminate = true;
-            StatusMessage = "Initializing MAME rebuild...";
-
-            try
-            {
-                var progress = new Progress<RebuildProgressReport>(r =>
-                {
-                    IsIndeterminate = false;
-                    if (r.Total > 0) ProgressMaximum = r.Total;
-                    if (r.Current > 0) ProgressValue = r.Current;
-                    if (!string.IsNullOrEmpty(r.CurrentMessage)) StatusMessage = r.CurrentMessage;
-                });
-
-                OutputFormat format = CompressionFormat switch
-                {
-                    ".7z" => OutputFormat.SevenZ,
-                    "Folder" => OutputFormat.Folder,
-                    _ => OutputFormat.Zip
-                };
-
-                RebuildResult? result = null;
-                await Task.Run(async () =>
-                {
-                    result = await _rebuilderService.RunMameRebuild(
-                        MameSourceDirs,
-                        MameOutputDir,
-                        MameDatPath,
-                        SelectedRebuildMode,
-                        format,
-                        progress
-                    );
-                });
-
-                StatusMessage = $"Rebuild completed successfully in {result?.ElapsedTime.ToString("mm\\:ss") ?? "00:00"}.";
             }
             catch (Exception ex)
             {
@@ -300,25 +210,17 @@ namespace RomRebuilderUI.ViewModels
         }
     }
 
-    internal class MameSettingsDto
+    internal class MameRebuilderSettingsDto
     {
         public string DatPath { get; set; } = string.Empty;
         public List<string> SourceDirs { get; set; } = new();
-        public string OutputDir { get; set; } = string.Empty;
+        public List<string> AddPaths { get; set; } = new();
+        public string OutputDirectory { get; set; } = string.Empty;
         public RebuildMode RebuildMode { get; set; }
-        public string CompressionFormat { get; set; } = string.Empty;
-        
-        // Scanner & Auditor Options
-        public bool AuditRoms { get; set; }
-        public bool AuditDisks { get; set; }
-        public bool AuditSamples { get; set; }
-        public bool AuditBios { get; set; }
-        public bool DecompressAndVerify { get; set; }
-        public bool ChdDeepVerify { get; set; }
-        public bool FixMissingFiles { get; set; }
-        public bool FixUnneededFiles { get; set; }
-
+        public string CompressionFormat { get; set; } = ".zip";
         public bool SeparateBiosSets { get; set; }
+        public bool RecompressFiles { get; set; }
         public bool RemoveMatchedSourceFiles { get; set; }
+        public bool VerifyHashesOnMatch { get; set; }
     }
 }

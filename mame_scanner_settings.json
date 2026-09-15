@@ -1,0 +1,15 @@
+{
+  "DatPath": "/home/doug/Downloads/Games_Project/C.NET/DATs/MAME 0.264 (arcade).dat",
+  "SourceDirs": [
+    "/home/doug/Downloads/MAME_Games/"
+  ],
+  "RebuildMode": 2,
+  "AuditRoms": true,
+  "AuditDisks": false,
+  "AuditSamples": false,
+  "AuditBios": false,
+  "DecompressAndVerify": false,
+  "ChdDeepVerify": false,
+  "FixMissingFiles": false,
+  "FixUnneededFiles": false
+}

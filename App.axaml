@@ -7,6 +7,10 @@
 
     <!-- Explicitly map ViewModels to their corresponding Views -->
     <Application.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:MameScannerViewModel}">
+            <v:MameScannerView/>
+        </DataTemplate>
+        
         <DataTemplate DataType="{x:Type vm:MameWorkflowViewModel}">
             <v:MameWorkflowView/>
         </DataTemplate>
@@ -26,6 +30,6 @@
 
     <Application.Styles>
         <FluentTheme/>
-    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
     </Application.Styles>
 </Application>

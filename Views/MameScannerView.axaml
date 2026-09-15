@@ -1,11 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:d="http://schemas.openxmlformats.org/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:RomRebuilderUI.ViewModels"
+             xmlns:models="using:RomRebuilderUI.Models"
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
              x:Class="RomRebuilderUI.Views.MameScannerView"
-             x:DataType="vm:MameScannerViewModel">
+             x:DataType="vm:MameScannerViewModel"
+             Background="#1E1E1E">
 
     <Grid>
         <Grid ColumnDefinitions="460, 12, *" Margin="16">
@@ -121,7 +123,8 @@
                             <TextBlock Text="Sets Explorer" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
                                 <TextBlock Text="Sort:" FontSize="11" Foreground="DarkGray" VerticalAlignment="Center"/>
-                                <ComboBox Width="120" FontSize="11" 
+                                <!-- Sort ComboBox made 10 pixels longer (120 -> 130) -->
+                                <ComboBox Width="130" FontSize="11" 
                                           ItemsSource="{Binding SortOptions}" 
                                           SelectedItem="{Binding SelectedSortOption}"/>
                             </StackPanel>
@@ -131,13 +134,26 @@
                                   ItemsSource="{Binding MameAuditItems}" 
                                   SelectedItem="{Binding SelectedAuditItem}"
                                   AutoGenerateColumns="False" 
+                                  CanUserResizeColumns="True"
+                                  CanUserReorderColumns="True"
                                   IsReadOnly="True"
                                   Background="#1E1E1E"
                                   Foreground="White">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Machine Name" Binding="{Binding Name}" Width="*"/>
-                                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="180"/>
-                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95"/>
+                                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="2*"/>
+                                <DataGridTextColumn Header="Machine Name" Binding="{Binding Name}" Width="1.5*"/>
+                                
+                                <!-- Color-coded Status Column with SortMemberPath enabled -->
+                                <DataGridTemplateColumn Header="Status" Width="95" SortMemberPath="Status">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:MachineAuditItem">
+                                            <TextBlock Text="{Binding Status}" 
+                                                       Foreground="{Binding StatusColor}" 
+                                                       VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
                                 <DataGridTextColumn Header="Files" Binding="{Binding RomCountSummary}" Width="Auto"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -146,8 +162,8 @@
                     <!-- 3. Missing Files Drill-Down -->
                     <Border Grid.Row="3" BorderBrush="#33808080" BorderThickness="1" CornerRadius="4" Background="#121212" Padding="8" Margin="0,8,0,0">
                         <Grid RowDefinitions="Auto, *">
-                            <TextBlock Grid.Row="0" Text="{Binding SelectedAuditItem.Name, StringFormat='Missing Files for: {0}'}" FontWeight="SemiBold" FontSize="11" Foreground="DarkGray" Margin="0,0,0,4"/>
-                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedAuditItem.MissingFiles}" Background="Transparent" BorderThickness="0" FontSize="11">
+                            <TextBlock Grid.Row="0" Text="{Binding SelectedMachineNameDisplay}" FontWeight="SemiBold" FontSize="11" Foreground="DarkGray" Margin="0,0,0,4"/>
+                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedMissingFiles}" Background="Transparent" BorderThickness="0" FontSize="11">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding}" Foreground="IndianRed"/>

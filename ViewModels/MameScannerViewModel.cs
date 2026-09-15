@@ -43,7 +43,17 @@ namespace RomRebuilderUI.ViewModels
 
         // --- Sorting & Filtering ---
         [ObservableProperty] private string _selectedSortOption = "Machine Name";
-        public List<string> SortOptions { get; } = new() { "Machine Name", "Description", "Status", "Missing Files" };
+        
+        // Updated Sort options to group/prioritize by status categories
+        public List<string> SortOptions { get; } = new() 
+        { 
+            "Machine Name", 
+            "Description", 
+            "Complete First", 
+            "Incomplete First", 
+            "Missing First", 
+            "Unknown First" 
+        };
 
         partial void OnSelectedSortOptionChanged(string value)
         {
@@ -62,6 +72,24 @@ namespace RomRebuilderUI.ViewModels
         [ObservableProperty] private ObservableCollection<MachineAuditItem> _mameAuditItems = new();
         private List<MachineAuditItem> _unfilteredAuditCache = new();
         [ObservableProperty] private MachineAuditItem? _selectedAuditItem;
+
+        // Safe properties for the details pane to prevent null-binding errors
+        [ObservableProperty] private string _selectedMachineNameDisplay = "Missing Files";
+        [ObservableProperty] private ObservableCollection<string> _selectedMissingFiles = new();
+
+        partial void OnSelectedAuditItemChanged(MachineAuditItem? value)
+        {
+            if (value != null)
+            {
+                SelectedMachineNameDisplay = $"Missing Files for: {value.Name}";
+                SelectedMissingFiles = new ObservableCollection<string>(value.MissingFiles ?? new());
+            }
+            else
+            {
+                SelectedMachineNameDisplay = "Missing Files";
+                SelectedMissingFiles.Clear();
+            }
+        }
 
         public MameScannerViewModel()
         {
@@ -151,6 +179,8 @@ namespace RomRebuilderUI.ViewModels
             _unfilteredAuditCache.Clear();
             MameAuditItems.Clear();
             SelectedAuditItem = null;
+            SelectedMissingFiles.Clear();
+            SelectedMachineNameDisplay = "Missing Files";
             HasAuditItems = false;
             ProgressValue = 0;
             ProgressMaximum = 100;
@@ -164,8 +194,10 @@ namespace RomRebuilderUI.ViewModels
             var sorted = SelectedSortOption switch
             {
                 "Description" => _unfilteredAuditCache.OrderBy(x => x.Description).ThenBy(x => x.Name),
-                "Status" => _unfilteredAuditCache.OrderBy(x => x.Status).ThenBy(x => x.Name),
-                "Missing Files" => _unfilteredAuditCache.OrderByDescending(x => x.MissingFiles?.Count ?? 0).ThenBy(x => x.Name),
+                "Complete First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
+                "Incomplete First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Incomplete", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
+                "Missing First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Missing", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
+                "Unknown First" => _unfilteredAuditCache.OrderByDescending(x => x.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase)).ThenBy(x => x.Name),
                 _ => _unfilteredAuditCache.OrderBy(x => x.Name).AsEnumerable()
             };
 
@@ -198,6 +230,10 @@ namespace RomRebuilderUI.ViewModels
                         MameSourceDirs,
                         MameDatPath,
                         SelectedRebuildMode,
+                        AuditRoms,
+                        AuditDisks,
+                        AuditSamples,
+                        AuditBios,
                         progress,
                         item => 
                         { 

@@ -12,56 +12,88 @@ namespace RomRebuilderUI.Views
             InitializeComponent();
         }
 
-        public async void OnBrowseDatClick(object? sender, RoutedEventArgs e)
+        private async void OnBrowseDatClick(object? sender, RoutedEventArgs e)
         {
-            if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-            var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            if (DataContext is MameWorkflowViewModel vm)
             {
-                Title = "Select MAME DAT / XML File",
-                AllowMultiple = false,
-                FileTypeFilter = new[]
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
+
+                var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    new FilePickerFileType("DAT / XML Files") { Patterns = new[] { "*.xml", "*.dat" } },
-                    new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
+                    Title = "Select MAME DAT / XML File",
+                    AllowMultiple = false,
+                    FileTypeFilter = new[]
+                    {
+                        new FilePickerFileType("DAT & XML Files") { Patterns = new[] { "*.dat", "*.xml" } },
+                        new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
+                    }
+                });
+
+                if (files.Count > 0)
+                {
+                    vm.SetDatPath(files[0].Path.LocalPath);
                 }
-            });
-
-            if (files.Count > 0 && DataContext is MameWorkflowViewModel vm)
-            {
-                vm.SetDatPath(files[0].Path.LocalPath);
             }
         }
 
-        public async void OnAddSourceClick(object? sender, RoutedEventArgs e)
+        private async void OnAddSourceClick(object? sender, RoutedEventArgs e)
         {
-            if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-            var folders = await window.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            if (DataContext is MameWorkflowViewModel vm)
             {
-                Title = "Select Source ROM Directory",
-                AllowMultiple = false
-            });
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
 
-            if (folders.Count > 0 && DataContext is MameWorkflowViewModel vm)
-            {
-                vm.AddSource(folders[0].Path.LocalPath);
+                var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Select Primary Source ROM Directory",
+                    AllowMultiple = false
+                });
+
+                if (folders.Count > 0)
+                {
+                    vm.AddSource(folders[0].Path.LocalPath);
+                }
             }
         }
 
-        public async void OnBrowseOutputClick(object? sender, RoutedEventArgs e)
+        private async void OnAddAddPathClick(object? sender, RoutedEventArgs e)
         {
-            if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-            var folders = await window.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            if (DataContext is MameWorkflowViewModel vm)
             {
-                Title = "Select Output Directory",
-                AllowMultiple = false
-            });
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
 
-            if (folders.Count > 0 && DataContext is MameWorkflowViewModel vm)
+                var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Select Auxiliary Add-Path Directory",
+                    AllowMultiple = false
+                });
+
+                if (folders.Count > 0)
+                {
+                    vm.AddAddPath(folders[0].Path.LocalPath);
+                }
+            }
+        }
+
+        private async void OnBrowseOutputClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is MameWorkflowViewModel vm)
             {
-                vm.SetOutputDir(folders[0].Path.LocalPath);
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
+
+                var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Select Output Destination Directory",
+                    AllowMultiple = false
+                });
+
+                if (folders.Count > 0)
+                {
+                    vm.SetOutputDirectory(folders[0].Path.LocalPath);
+                }
             }
         }
     }
